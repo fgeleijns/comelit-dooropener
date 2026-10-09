@@ -1,0 +1,20 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "nl.frank.simplebusdoor"
+    compileSdk 36
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    defaultConfig {
+        applicationId "nl.frank.simplebusdoor"
+        minSdk 26
+        targetSdk 36
+        versionCode 44
+        versionName "0.1.43"
+    }
+}
