@@ -12,8 +12,8 @@ from reportlab.platypus import (
 )
 
 
-OUTPUT = r"C:\Users\fgel\Documents\Codex\2026-06-07\ik-heb-deze-translator-op-bijgevoegde\outputs\Comelit-dooropener-0.1.43-user-guide.pdf"
-VERSION = "0.1.43"
+OUTPUT = r"C:\Users\fgel\Documents\Codex\2026-06-07\ik-heb-deze-translator-op-bijgevoegde\outputs\Comelit-dooropener-0.1.118-user-guide.pdf"
+VERSION = "0.1.118"
 
 
 def footer(canvas, doc):
