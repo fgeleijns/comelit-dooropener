@@ -23,6 +23,15 @@ The APK does not include private Home Assistant URLs, tokens or proxy settings. 
 - Bridge web/API URL
 - Optional bridge proxy URL and token
 
+## Current release
+
+- Version: `0.1.118`
+- Version code: `119`
+- APK: `Comelit-dooropener-0.1.118-release.apk`
+- User guide: `Comelit-dooropener-0.1.118-user-guide.pdf`
+
+The release APK does not contain Frank's private Home Assistant URLs, access tokens, bridge proxy tokens or local network settings. These are configured on the phone after installation.
+
 ## Updates
 
 The app checks this file for update metadata:
@@ -36,12 +45,12 @@ Example `version.json`:
 
 ```json
 {
-  "versionCode": 44,
-  "versionName": "0.1.43",
-  "apkUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.1.43/Comelit-dooropener-0.1.43-release.apk",
-  "guideUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.1.43/Comelit-dooropener-0.1.43-user-guide.pdf",
-  "releaseUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/tag/v0.1.43",
-  "notes": "Release notes"
+  "versionCode": 119,
+  "versionName": "0.1.118",
+  "apkUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.1.118/Comelit-dooropener-0.1.118-release.apk",
+  "guideUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.1.118/Comelit-dooropener-0.1.118-user-guide.pdf",
+  "releaseUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/tag/v0.1.118",
+  "notes": "Updated Comelit Dooropener app with refined phone UI, portrait-only layout, persistent doorbell monitor, localized Dutch/English/German texts, doorbell history improvements, garage control, auto-open safety modes, bus monitor history and updated release documentation."
 }
 ```
 
