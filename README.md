@@ -28,7 +28,7 @@ The APK does not include private Home Assistant URLs, tokens or proxy settings. 
 - Version: `0.1.118`
 - Version code: `119`
 - APK: `Comelit-dooropener-0.1.118-release.apk`
-- User guide: `Comelit-dooropener-0.1.118-user-guide.pdf`
+- User guide: [`Comelit-dooropener-0.1.118-user-guide.pdf`](docs/Comelit-dooropener-0.1.118-user-guide.pdf)
 
 The release APK does not contain Frank's private Home Assistant URLs, access tokens, bridge proxy tokens or local network settings. These are configured on the phone after installation.
 
