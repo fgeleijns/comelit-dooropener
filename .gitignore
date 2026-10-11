@@ -8,3 +8,9 @@ keystore.properties
 local.properties
 *.apk
 *.apks
+check-phone-settings.ps1
+set-connection-auto.ps1
+set-external-url.ps1
+set-phone-settings.ps1
+set-proxy-settings.ps1
+test-external-ha.ps1

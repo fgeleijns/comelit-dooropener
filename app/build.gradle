@@ -14,7 +14,7 @@ android {
         applicationId "nl.frank.simplebusdoor"
         minSdk 26
         targetSdk 36
-        versionCode 44
-        versionName "0.1.43"
+        versionCode 119
+        versionName "0.1.118"
     }
 }

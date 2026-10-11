@@ -20,6 +20,7 @@ import android.os.Looper;
 
 import org.json.JSONObject;
 
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.Date;
@@ -40,6 +41,7 @@ public class DoorMonitorService extends Service {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private Ringtone activeRingtone;
+    private AudioAttributes ringAudioAttributes;
     private int repeatsLeft;
     private boolean lastEntryOn;
 
@@ -124,13 +126,17 @@ public class DoorMonitorService extends Service {
                 .apply();
         updateServiceNotification();
         playDoorbellSound(prefs);
-        handler.postDelayed(() -> markUnansweredIfNeeded(ringId), 60000);
+        long activeMs = doorbellNotificationMs(prefs);
+        handler.postDelayed(() -> markUnansweredIfNeeded(ringId), activeMs);
 
-        Intent openIntent = new Intent(this, MainActivity.class);
-        openIntent.setAction("open_door");
+        Intent ringIntent = new Intent(this, DoorRingActivity.class);
+        ringIntent.setAction(DoorRingActivity.ACTION_SHOW);
+        PendingIntent ringPending = PendingIntent.getActivity(this, RING_NOTIFICATION_ID + 2, ringIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        Intent openIntent = new Intent(this, DoorRingActivity.class);
+        openIntent.setAction(DoorRingActivity.ACTION_OPEN);
         PendingIntent openPending = PendingIntent.getActivity(this, RING_NOTIFICATION_ID, openIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Intent dismissIntent = new Intent(this, MainActivity.class);
-        dismissIntent.setAction("dismiss_ring");
+        Intent dismissIntent = new Intent(this, DoorRingActivity.class);
+        dismissIntent.setAction(DoorRingActivity.ACTION_DISMISS);
         PendingIntent dismissPending = PendingIntent.getActivity(this, RING_NOTIFICATION_ID + 1, dismissIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         long now = System.currentTimeMillis();
         String time = android.text.format.DateFormat.getTimeFormat(this).format(new Date(now));
@@ -140,9 +146,15 @@ public class DoorMonitorService extends Service {
                 .addAction(android.R.drawable.ic_menu_send, t(prefs, "Deur openen", "Open door", "Tür öffnen"), openPending)
                 .addAction(android.R.drawable.ic_menu_close_clear_cancel, t(prefs, "Niet openen", "Do not open", "Nicht öffnen"), dismissPending)
                 .setCategory(Notification.CATEGORY_ALARM)
+                .setPriority(Notification.PRIORITY_MAX)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setWhen(now)
                 .setShowWhen(true)
-                .setAutoCancel(true)
+                .setAutoCancel(false)
+                .setOngoing(true)
+                .setContentIntent(ringPending)
+                .setFullScreenIntent(ringPending, true)
+                .setTimeoutAfter(activeMs)
                 .build();
         manager.notify(RING_NOTIFICATION_ID, notification);
         handler.postDelayed(() -> executor.execute(() -> handleAutoOpen(getSharedPreferences("settings", MODE_PRIVATE), ringId)), AUTO_OPEN_DELAY_MS);
@@ -173,7 +185,7 @@ public class DoorMonitorService extends Service {
         attempt.apply();
 
         try {
-            callServiceWithFallback(prefs, "button", "press", HaClient.OPEN_DOOR);
+            callOpenDoorRepeated(prefs);
             appendDoorbellHistory(prefs,
                     autoOpenHistoryText(mode),
                     false);
@@ -182,6 +194,23 @@ public class DoorMonitorService extends Service {
             appendDoorbellHistory(prefs, t(prefs, "Automatisch openen mislukt: ", "Auto-open failed: ", "Automatisches Öffnen fehlgeschlagen: ") + readableError(prefs, e), false);
             updateServiceNotification();
         }
+    }
+
+    private void callOpenDoorRepeated(SharedPreferences prefs) throws Exception {
+        int attempts = Math.max(1, Math.min(3, prefs.getInt("auto_open_repeat_count", 1)));
+        int delayMs = Math.max(300, Math.min(2000, prefs.getInt("open_repeat_delay_ms", 700)));
+        boolean sent = false;
+        Exception last = null;
+        for (int i = 0; i < attempts; i++) {
+            if (i > 0) Thread.sleep(delayMs);
+            try {
+                callServiceWithFallback(prefs, "button", "press", HaClient.OPEN_DOOR);
+                sent = true;
+            } catch (Exception e) {
+                last = e;
+            }
+        }
+        if (!sent && last != null) throw last;
     }
 
     private void callServiceWithFallback(SharedPreferences prefs, String domain, String service, String entityId) throws Exception {
@@ -231,18 +260,21 @@ public class DoorMonitorService extends Service {
     private void playDoorbellSound(SharedPreferences prefs) {
         try {
             stopDoorbellSound();
-            AudioAttributes audio = new AudioAttributes.Builder()
+            ringAudioAttributes = new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build();
             repeatsLeft = Math.max(1, Math.min(10, prefs.getInt("doorbell_repeat_count", 1))) - 1;
-            activeRingtone = RingtoneManager.getRingtone(this, ringSound(prefs));
-            if (activeRingtone == null) return;
-            activeRingtone.setAudioAttributes(audio);
-            activeRingtone.play();
+            playSingleDoorbellTone(prefs);
             scheduleNextRing();
         } catch (Exception ignored) {
         }
+    }
+
+    private long doorbellNotificationMs(SharedPreferences prefs) {
+        int seconds = prefs.getInt("doorbell_notification_seconds", 120);
+        seconds = Math.max(30, Math.min(300, seconds));
+        return seconds * 1000L;
     }
 
     private void scheduleNextRing() {
@@ -250,16 +282,26 @@ public class DoorMonitorService extends Service {
             try {
                 if (repeatsLeft > 0) {
                     repeatsLeft--;
-                    if (activeRingtone != null && activeRingtone.isPlaying()) activeRingtone.stop();
-                    if (activeRingtone != null) activeRingtone.play();
+                    playSingleDoorbellTone(getSharedPreferences("settings", MODE_PRIVATE));
                     scheduleNextRing();
                 } else {
                     if (activeRingtone != null && activeRingtone.isPlaying()) activeRingtone.stop();
                 }
             } catch (Exception ignored) {
             }
-        }, 5000);
+        }, 4000);
         handler.postDelayed(this::stopDoorbellSound, 120000);
+    }
+
+    private void playSingleDoorbellTone(SharedPreferences prefs) {
+        try {
+            if (activeRingtone != null && activeRingtone.isPlaying()) activeRingtone.stop();
+        } catch (Exception ignored) {
+        }
+        activeRingtone = RingtoneManager.getRingtone(this, ringSound(prefs));
+        if (activeRingtone == null) return;
+        if (ringAudioAttributes != null) activeRingtone.setAudioAttributes(ringAudioAttributes);
+        activeRingtone.play();
     }
 
     private void stopDoorbellSound() {
@@ -270,6 +312,7 @@ public class DoorMonitorService extends Service {
         } catch (Exception ignored) {
         } finally {
             activeRingtone = null;
+            ringAudioAttributes = null;
             repeatsLeft = 0;
         }
     }
@@ -327,7 +370,7 @@ public class DoorMonitorService extends Service {
             name = "Comelit dooropener";
             prefs.edit().putString("app_name", name).apply();
         }
-        return name;
+        return name.toUpperCase(Locale.ROOT);
     }
 
     private Notification.Builder baseNotification(String channel, String title, String text) {
@@ -366,9 +409,15 @@ public class DoorMonitorService extends Service {
         String[] lines = history.split("\\n");
         StringBuilder builder = new StringBuilder(summary);
         for (int i = 0; i < lines.length && i < 3; i++) {
-            builder.append('\n').append(lines[i]);
+            builder.append('\n').append(displayHistoryLine(lines[i]));
         }
         return builder.toString();
+    }
+
+    private String displayHistoryLine(String line) {
+        int marker = line.indexOf(" - ");
+        if (marker < 0) return line;
+        return line.substring(0, marker) + "  |  " + line.substring(marker + 3);
     }
 
     private String timeText(long millis) {
@@ -439,6 +488,7 @@ public class DoorMonitorService extends Service {
         if (prefs.getBoolean("doorbell_pending_handled", false)) return;
         appendDoorbellHistory(prefs, t(prefs, "Niet geopend (geen actie)", "Not opened (no action)", "Nicht geöffnet (keine Aktion)"), false);
         prefs.edit().putBoolean("doorbell_pending_handled", true).apply();
+        getSystemService(NotificationManager.class).cancel(RING_NOTIFICATION_ID);
         updateServiceNotification();
     }
 

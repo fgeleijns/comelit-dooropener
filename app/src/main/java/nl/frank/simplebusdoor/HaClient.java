@@ -10,6 +10,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 final class HaClient {
+    private static final int CONNECT_TIMEOUT_MS = 2500;
+    private static final int READ_TIMEOUT_MS = 3500;
     static final String ENTRY_DOOR = "binary_sensor.simplebus2_bridge_entry_door";
     static final String FLOOR_DOOR = "binary_sensor.simplebus2_bridge_floor_door";
     static final String HEARTBEAT = "binary_sensor.simplebus2_bridge_heartbeat";
@@ -89,8 +91,8 @@ final class HaClient {
 
     private static HttpURLConnection request(String url, String token, String method) throws Exception {
         HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
-        con.setConnectTimeout(15000);
-        con.setReadTimeout(15000);
+        con.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        con.setReadTimeout(READ_TIMEOUT_MS);
         con.setRequestMethod(method);
         if (token != null && !token.isEmpty()) con.setRequestProperty("Authorization", "Bearer " + token);
         con.setRequestProperty("Accept", "application/json");

@@ -21,7 +21,11 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.OpenableColumns;
+import android.text.InputFilter;
 import android.text.InputType;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -32,6 +36,7 @@ import android.widget.Toast;
 import org.json.JSONObject;
 
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -44,10 +49,15 @@ public class MainActivity extends Activity {
     private static final String AUTO_OPEN_ONCE = "once";
     private static final String AUTO_OPEN_TIMED = "timed";
     private static final String AUTO_OPEN_ALWAYS = "always";
-    private static final int BG = Color.rgb(12, 18, 32);
-    private static final int PANEL = Color.rgb(23, 32, 51);
-    private static final int PANEL_SOFT = Color.rgb(34, 48, 74);
-    private static final int ACCENT = Color.rgb(22, 160, 133);
+    private static final int MAX_APP_NAME_LENGTH = 18;
+    private static final String DEFAULT_SETTINGS_PIN = "8882";
+    private static final int BG = Color.rgb(18, 20, 22);
+    private static final int PANEL = Color.rgb(34, 37, 40);
+    private static final int PANEL_SOFT = Color.rgb(47, 52, 56);
+    private static final int ACCENT = Color.rgb(0, 150, 95);
+    private static final int ACCENT_DARK = Color.rgb(0, 118, 78);
+    private static final int ACCENT_SUBTLE = Color.rgb(25, 76, 61);
+    private static final int OUTLINE = Color.rgb(82, 116, 105);
     private static final int TEXT = Color.rgb(248, 250, 252);
     private static final int MUTED = Color.rgb(182, 194, 209);
 
@@ -66,10 +76,14 @@ public class MainActivity extends Activity {
     private Button connectionInternal;
     private Button connectionExternal;
     private Button showFloorDoorButton;
+    private Button showGarageButton;
+    private Button adminModeButton;
     private Button monitorButton;
     private Button ringButton;
     private boolean showApiSettings;
     private TextView appTitle;
+    private TextView headerStatus;
+    private TextView headerSummary;
     private TextView statusLine;
     private TextView entryStatus;
     private TextView floorStatus;
@@ -95,6 +109,12 @@ public class MainActivity extends Activity {
     private EditText bridgeThresholdInput;
     private EditText bridgeRtoInput;
     private EditText doorbellRepeatInput;
+    private EditText doorbellNotificationSecondsInput;
+    private EditText manualOpenRepeatInput;
+    private EditText autoOpenRepeatInput;
+    private EditText openRepeatDelayInput;
+    private EditText garageEntityInput;
+    private EditText settingsPinInput;
     private String language = "nl";
     private String connectionMode = "auto";
     private boolean settingsOpen;
@@ -102,6 +122,8 @@ public class MainActivity extends Activity {
     private boolean bridgeOpen;
     private boolean monitorRunning;
     private boolean showFloorDoor;
+    private boolean showGarage;
+    private boolean adminMode;
 
     private final Runnable refresher = new Runnable() {
         @Override public void run() {
@@ -116,8 +138,10 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(BG);
         language = prefs().getString("language", "nl");
         connectionMode = prefs().getString("connection_mode", "auto");
+        adminMode = prefs().getBoolean("admin_mode", true);
         migrateDefaultAppName();
         showFloorDoor = prefs().getBoolean("show_floor_door", false);
+        showGarage = prefs().getBoolean("show_garage", false);
         monitorRunning = prefs().getBoolean("door_notifications_enabled", false);
         buildShell();
         showControls();
@@ -158,40 +182,153 @@ public class MainActivity extends Activity {
     }
 
     private void buildShell() {
+        LinearLayout shell = new LinearLayout(this);
+        shell.setOrientation(LinearLayout.VERTICAL);
+        shell.setBackgroundColor(BG);
+        shell.setPadding(0, 0, 0, navigationBarHeight());
+
         ScrollView scroll = new ScrollView(this);
         scroll.setBackgroundColor(BG);
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(28, 26 + statusBarHeight(), 28, 34 + navigationBarHeight());
+        root.setPadding(28, 26 + statusBarHeight(), 28, 18);
         scroll.addView(root);
 
-        appTitle = title(appTitleText(), 26);
-        root.addView(appTitle);
-        TextView subtitle = body("Simplebus2 Bridge via Home Assistant");
-        subtitle.setTextColor(MUTED);
-        root.addView(subtitle);
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.VERTICAL);
+        header.setPadding(24, 20, 24, 20);
+        header.setBackground(round(ACCENT_DARK, 24));
+        LinearLayout.LayoutParams headerLp = new LinearLayout.LayoutParams(-1, -2);
+        headerLp.setMargins(0, 0, 0, 18);
+        header.setLayoutParams(headerLp);
 
-        LinearLayout tabs = new LinearLayout(this);
-        tabs.setOrientation(LinearLayout.HORIZONTAL);
-        tabs.setPadding(0, 22, 0, 8);
-        controlTab = smallButton(t("Bediening", "Controls"));
-        monitorTab = smallButton(t("Monitoring", "Monitor"));
-        bridgeTab = smallButton("Bridge");
-        settingsTab = smallButton(t("Instellingen", "Settings"));
-        tabs.addView(controlTab, new LinearLayout.LayoutParams(0, 86, 1));
-        tabs.addView(monitorTab, new LinearLayout.LayoutParams(0, 86, 1));
-        tabs.addView(bridgeTab, new LinearLayout.LayoutParams(0, 86, 1));
-        tabs.addView(settingsTab, new LinearLayout.LayoutParams(0, 86, 1));
-        root.addView(tabs);
-        controlTab.setOnClickListener(v -> showControls());
-        monitorTab.setOnClickListener(v -> showMonitor());
-        bridgeTab.setOnClickListener(v -> showBridgeSettings());
-        settingsTab.setOnClickListener(v -> showSettings());
+        android.widget.FrameLayout headerTop = new android.widget.FrameLayout(this);
+        headerTop.setMinimumHeight(dp(58));
+
+        appTitle = body(appTitleText());
+        appTitle.setTextSize(16);
+        appTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        appTitle.setTextColor(Color.WHITE);
+        appTitle.setGravity(android.view.Gravity.CENTER);
+        appTitle.setSingleLine(true);
+        appTitle.setMaxLines(1);
+        android.widget.FrameLayout.LayoutParams titleLp = new android.widget.FrameLayout.LayoutParams(-1, dp(58), android.view.Gravity.CENTER);
+        titleLp.setMargins(dp(66), 0, dp(66), 0);
+        headerTop.addView(appTitle, titleLp);
+
+        Button menuButton = baseButton("☰");
+        menuButton.setTextSize(24);
+        menuButton.setMinHeight(58);
+        menuButton.setPadding(0, 0, 0, 2);
+        menuButton.setBackground(round(Color.TRANSPARENT, 18));
+        menuButton.setOnClickListener(v -> showMainMenu());
+        headerTop.addView(menuButton, new android.widget.FrameLayout.LayoutParams(dp(58), dp(58), android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL));
+        header.addView(headerTop);
+
+        headerStatus = body(t("Verbinden...", "Connecting...", "Verbinden..."));
+        headerStatus.setTextColor(Color.rgb(220, 255, 238));
+        headerStatus.setTextSize(14);
+        headerStatus.setGravity(android.view.Gravity.CENTER);
+        LinearLayout.LayoutParams headerStatusLp = new LinearLayout.LayoutParams(-1, -2);
+        headerStatusLp.setMargins(0, 6, 0, 0);
+        headerStatus.setLayoutParams(headerStatusLp);
+        header.addView(headerStatus);
+
+        headerSummary = body("");
+        headerSummary.setTextColor(Color.rgb(220, 255, 238));
+        headerSummary.setTextSize(14);
+        headerSummary.setGravity(android.view.Gravity.CENTER);
+        headerSummary.setPadding(12, 8, 12, 8);
+        headerSummary.setBackground(round(Color.rgb(0, 96, 64), 18));
+        LinearLayout.LayoutParams headerSummaryLp = new LinearLayout.LayoutParams(-1, -2);
+        headerSummaryLp.setMargins(0, 10, 0, 0);
+        headerSummary.setLayoutParams(headerSummaryLp);
+        header.addView(headerSummary);
+        root.addView(header);
 
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         root.addView(content);
-        setContentView(scroll);
+        shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        shell.addView(appFooter());
+        setContentView(shell);
+    }
+
+    private void showMainMenu() {
+        if (!adminMode) {
+            String[] userItems = new String[]{
+                    "Home",
+                    t("Beheerdermodus", "Admin mode", "Administratormodus")
+            };
+            new AlertDialog.Builder(this)
+                    .setTitle(appTitleText())
+                    .setItems(userItems, (dialog, which) -> {
+                        if (which == 0) showControls();
+                        if (which == 1) requestSettingsPin(() -> {
+                            adminMode = true;
+                            prefs().edit().putBoolean("admin_mode", true).apply();
+                            toast(t("Beheerdermodus actief", "Admin mode active", "Administratormodus aktiv"));
+                            showControls();
+                        });
+                    })
+                    .show();
+            return;
+        }
+
+        String[] items = new String[]{
+                "Home",
+                t("Monitoring", "Monitor", "Überwachung"),
+                "Bridge",
+                t("Instellingen", "Settings", "Einstellungen")
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(appTitleText())
+                .setItems(items, (dialog, which) -> {
+                    if (which == 0) showControls();
+                    if (which == 1) showMonitor();
+                    if (which == 2) requestSettingsPin(this::showBridgeSettings);
+                    if (which == 3) requestSettingsPin(this::showSettings);
+                })
+                .show();
+    }
+
+    private void requestSettingsPin(Runnable onUnlocked) {
+        EditText pinInput = new EditText(this);
+        pinInput.setHint(t("Pincode", "PIN code", "PIN-Code"));
+        pinInput.setHintTextColor(Color.rgb(148, 163, 184));
+        pinInput.setTextColor(TEXT);
+        pinInput.setTextSize(18);
+        pinInput.setGravity(android.view.Gravity.CENTER);
+        pinInput.setSingleLine(true);
+        pinInput.setBackground(round(PANEL_SOFT, 18));
+        pinInput.setPadding(18, 14, 18, 14);
+        pinInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        pinInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(8)});
+
+        LinearLayout pinBox = new LinearLayout(this);
+        pinBox.setGravity(android.view.Gravity.CENTER);
+        pinBox.setPadding(0, 12, 0, 0);
+        pinBox.addView(pinInput, new LinearLayout.LayoutParams(dp(170), -2));
+
+        AlertDialog pinDialog = new AlertDialog.Builder(this)
+                .setTitle(t("Beveiligd", "Protected", "Geschützt"))
+                .setMessage(t(
+                        "Voer de pincode in om dit scherm te openen.",
+                        "Enter the PIN code to open this screen.",
+                        "PIN-Code eingeben, um diese Seite zu öffnen."))
+                .setView(pinBox)
+                .setNegativeButton(t("Annuleren", "Cancel", "Abbrechen"), null)
+                .setPositiveButton(t("Openen", "Open", "Öffnen"), (dialog, which) -> {
+                    String expected = prefs().getString("settings_pin", DEFAULT_SETTINGS_PIN);
+                    if (pinInput.getText().toString().trim().equals(expected)) {
+                        onUnlocked.run();
+                    } else {
+                        toast(t("Onjuiste pincode", "Incorrect PIN", "Falscher PIN-Code"));
+                    }
+                })
+                .show();
+        pinInput.requestFocus();
+        pinDialog.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
     }
 
     private void showControls() {
@@ -201,20 +338,33 @@ public class MainActivity extends Activity {
         content.removeAllViews();
         styleTabs();
 
-        statusLine = body(t("Verbinden...", "Connecting..."));
-        statusLine.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        content.addView(card(statusLine));
-
-        content.addView(title(t("Status", "Status"), 23));
-        entryStatus = statusCard(t("Bel hoofdingang", "Main entrance bell"));
-        floorStatus = showFloorDoor ? statusCard(t("Bel etage/appartement", "Floor/apartment bell")) : null;
-        heartbeatStatus = statusCard("Bridge");
-        ringStatus = statusCard(t("Automatisch openen", "Auto-open"));
-
-        content.addView(title(t("Bediening", "Controls"), 23));
-        Button open = actionButton(t("Deur openen", "Open door"));
+        Button open = actionButton(t("Entree deur openen", "Open entrance door", "Eingangstür öffnen"));
+        open.setTextSize(18);
+        open.setMinHeight(dp(132));
+        open.setPadding(dp(22), dp(16), dp(22), dp(16));
+        LinearLayout.LayoutParams openLp = new LinearLayout.LayoutParams(-1, -2);
+        openLp.setMargins(0, dp(20), 0, dp(24));
+        open.setLayoutParams(openLp);
         open.setOnClickListener(v -> openDoor());
         content.addView(open);
+
+        if (showGarage && !garageEntityId().isEmpty()) {
+            if (adminMode) {
+                TextView garageLabel = label(t("Extra bediening", "Extra control", "Zusatzbedienung"));
+                garageLabel.setTextSize(14);
+                garageLabel.setGravity(android.view.Gravity.CENTER);
+                content.addView(garageLabel);
+            }
+
+            Button garage = garageButton(t("Parkeergarage", "Parking garage", "Parkgarage"));
+            garage.setOnClickListener(v -> openGarageDoor());
+            content.addView(garage);
+        }
+
+        if (!adminMode) {
+            refresh();
+            return;
+        }
 
         ringButton = secondaryButton(t("Automatisch openen laden...", "Loading auto-open..."));
         ringButton.setOnClickListener(v -> toggleRing());
@@ -224,9 +374,9 @@ public class MainActivity extends Activity {
         monitorButton.setOnClickListener(v -> toggleMonitor());
         content.addView(monitorButton);
 
-        content.addView(title(t("Belgeschiedenis", "Doorbell history"), 23));
-        doorbellHistory = body(doorbellHistoryText());
-        content.addView(card(doorbellHistory));
+        Button fullHistory = secondaryButton(t("Belgeschiedenis", "Doorbell history", "Klingelverlauf"));
+        fullHistory.setOnClickListener(v -> showFullDoorbellHistory());
+        content.addView(fullHistory);
 
         refresh();
     }
@@ -241,7 +391,8 @@ public class MainActivity extends Activity {
         content.addView(title(t("Instellingen", "Settings"), 23));
 
         content.addView(label(t("Appnaam", "App name")));
-        appNameInput = input(t("Naam die bovenin de app en meldingen staat", "Name shown in the app and notifications"), false, false);
+        appNameInput = input(t("Maximaal 18 tekens", "Maximum 18 characters", "Maximal 18 Zeichen"), false, false);
+        appNameInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(MAX_APP_NAME_LENGTH)});
         appNameInput.setText(appName());
         content.addView(appNameInput);
 
@@ -265,6 +416,15 @@ public class MainActivity extends Activity {
         showFloorDoorButton.setOnClickListener(v -> toggleShowFloorDoor());
         content.addView(showFloorDoorButton);
 
+        content.addView(label(t("Extra bediening", "Extra control", "Zusatzbedienung")));
+        showGarageButton = secondaryButton(showGarage ? t("Parkeergarage tonen: aan", "Show parking garage: on", "Parkgarage anzeigen: ein") : t("Parkeergarage tonen: uit", "Show parking garage: off", "Parkgarage anzeigen: aus"));
+        showGarageButton.setOnClickListener(v -> toggleShowGarage());
+        content.addView(showGarageButton);
+
+        garageEntityInput = input("switch.tasmota_2", false, false);
+        garageEntityInput.setText(prefs().getString("garage_entity_id", "switch.tasmota_2"));
+        content.addView(garageEntityInput);
+
         Button ringtoneButton = secondaryButton(t("Beltoon kiezen: ", "Choose ringtone: ") + ringtoneName());
         ringtoneButton.setOnClickListener(v -> chooseDoorbellRingtone());
         content.addView(ringtoneButton);
@@ -274,6 +434,47 @@ public class MainActivity extends Activity {
         doorbellRepeatInput.setInputType(InputType.TYPE_CLASS_NUMBER);
         doorbellRepeatInput.setText(String.valueOf(prefs().getInt("doorbell_repeat_count", 1)));
         content.addView(doorbellRepeatInput);
+
+        content.addView(label(t("Belmelding bewaren", "Keep doorbell notification", "Klingelmeldung behalten")));
+        doorbellNotificationSecondsInput = input(t("Aantal seconden, 30-300", "Seconds, 30-300", "Sekunden, 30-300"), false, false);
+        doorbellNotificationSecondsInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        doorbellNotificationSecondsInput.setText(String.valueOf(prefs().getInt("doorbell_notification_seconds", 120)));
+        content.addView(doorbellNotificationSecondsInput);
+
+        content.addView(label(t("Deur openen herhalen", "Repeat door opening", "Türöffnen wiederholen")));
+        manualOpenRepeatInput = input(t("Handmatig openen: aantal signalen, 1-5", "Manual open: number of signals, 1-5", "Manuell öffnen: Anzahl Signale, 1-5"), false, false);
+        manualOpenRepeatInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        manualOpenRepeatInput.setText(String.valueOf(prefs().getInt("manual_open_repeat_count", 2)));
+        content.addView(manualOpenRepeatInput);
+
+        autoOpenRepeatInput = input(t("Automatisch openen: aantal signalen, 1-3", "Auto-open: number of signals, 1-3", "Automatisch öffnen: Anzahl Signale, 1-3"), false, false);
+        autoOpenRepeatInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        autoOpenRepeatInput.setText(String.valueOf(prefs().getInt("auto_open_repeat_count", 1)));
+        content.addView(autoOpenRepeatInput);
+
+        openRepeatDelayInput = input(t("Pauze tussen signalen in milliseconden, 300-2000", "Delay between signals in milliseconds, 300-2000", "Pause zwischen Signalen in Millisekunden, 300-2000"), false, false);
+        openRepeatDelayInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        openRepeatDelayInput.setText(String.valueOf(prefs().getInt("open_repeat_delay_ms", 700)));
+        content.addView(openRepeatDelayInput);
+
+        content.addView(label(t("Pincode voor Bridge en Instellingen", "PIN for Bridge and Settings", "PIN für Bridge und Einstellungen")));
+        TextView pinHelp = body(t(
+                "Deze pincode beschermt de schermen waar verbindingen, tokens en bridge-instellingen gewijzigd kunnen worden.",
+                "This PIN protects the screens where connections, tokens and bridge settings can be changed.",
+                "Diese PIN schützt die Seiten, auf denen Verbindungen, Tokens und Bridge-Einstellungen geändert werden können."));
+        pinHelp.setTextColor(MUTED);
+        content.addView(card(pinHelp));
+        settingsPinInput = input(t("Pincode voor Bridge en Instellingen", "PIN for Bridge and Settings", "PIN für Bridge und Einstellungen"), false, true);
+        settingsPinInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        settingsPinInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(8)});
+        settingsPinInput.setText(prefs().getString("settings_pin", DEFAULT_SETTINGS_PIN));
+        content.addView(settingsPinInput);
+
+        adminModeButton = secondaryButton(adminMode
+                ? t("Appmodus: beheerder", "App mode: admin", "App-Modus: Administrator")
+                : t("Appmodus: gebruiker", "App mode: user", "App-Modus: Benutzer"));
+        adminModeButton.setOnClickListener(v -> toggleAdminMode());
+        content.addView(adminModeButton);
 
         Button api = secondaryButton(showApiSettings ? t("API / Web instellingen verbergen", "Hide API / Web settings") : t("API / Web instellingen", "API / Web settings"));
         api.setOnClickListener(v -> {
@@ -368,12 +569,6 @@ public class MainActivity extends Activity {
         content.removeAllViews();
         styleTabs();
         content.addView(title(t("Bus-monitor", "Bus monitor"), 23));
-        TextView intro = body(t(
-                "Deze pagina leest de debugstatus rechtstreeks uit de Simplebus2 Bridge. Dit is geen volledig live buslog, maar laat wel laatste code/adres en fouttellers zien.",
-                "This page reads debug status directly from the Simplebus2 Bridge. It is not a full live bus log, but it shows the last code/address and error counters."
-        ));
-        intro.setTextColor(MUTED);
-        content.addView(card(intro));
 
         statusLine = body(t("Monitoring ophalen...", "Loading monitor..."));
         statusLine.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -488,12 +683,47 @@ public class MainActivity extends Activity {
         return row;
     }
 
-    private TextView statusCard(String label) {
-        TextView tv = body(label + "\n-");
-        tv.setTextSize(18);
+    private void addStatusGrid() {
+        LinearLayout grid = new LinearLayout(this);
+        grid.setOrientation(LinearLayout.VERTICAL);
+        grid.setPadding(24, 18, 24, 18);
+        grid.setBackground(round(PANEL, 22));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(0, 16, 0, 0);
+        grid.setLayoutParams(lp);
+
+        entryStatus = statusLineView(t("Hoofdingang", "Entrance", "Eingang"));
+        heartbeatStatus = statusLineView("Bridge");
+        ringStatus = statusLineView(t("Auto-open", "Auto-open", "Auto-Öffnen"));
+        grid.addView(entryStatus);
+        grid.addView(heartbeatStatus);
+        grid.addView(ringStatus);
+        if (showFloorDoor) {
+            floorStatus = statusLineView(t("Etage", "Floor", "Etage"));
+            grid.addView(floorStatus);
+        }
+
+        content.addView(grid);
+    }
+
+    private TextView statusLineView(String label) {
+        TextView tv = body(label + ": -");
+        tv.setTextSize(15);
         tv.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        tv.setMinHeight(120);
-        content.addView(card(tv));
+        tv.setMinHeight(36);
+        return tv;
+    }
+
+    private TextView appFooter() {
+        TextView tv = body("© Frank Geleijns · v" + BuildConfig.VERSION_NAME);
+        tv.setTextSize(13);
+        tv.setGravity(android.view.Gravity.CENTER);
+        tv.setTextColor(Color.rgb(200, 235, 218));
+        tv.setPadding(14, 8, 14, 8);
+        tv.setBackground(round(Color.rgb(0, 82, 55), 18));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(28, 6, 28, 8);
+        tv.setLayoutParams(lp);
         return tv;
     }
 
@@ -558,13 +788,21 @@ public class MainActivity extends Activity {
 
     private Button actionButton(String label) {
         Button button = baseButton(label);
-        button.setBackground(round(ACCENT, 20));
+        button.setBackground(roundStroke(ACCENT_DARK, Color.rgb(38, 205, 142), 20, dp(1)));
         return button;
     }
 
     private Button secondaryButton(String label) {
         Button button = baseButton(label);
-        button.setBackground(round(PANEL_SOFT, 20));
+        button.setBackground(roundStroke(PANEL_SOFT, OUTLINE, 20, 2));
+        return button;
+    }
+
+    private Button garageButton(String label) {
+        Button button = baseButton(label);
+        button.setTextSize(15);
+        button.setMinHeight(92);
+        button.setBackground(roundStroke(ACCENT_SUBTLE, ACCENT, 20, 2));
         return button;
     }
 
@@ -603,6 +841,12 @@ public class MainActivity extends Activity {
         return drawable;
     }
 
+    private GradientDrawable roundStroke(int color, int strokeColor, int radius, int strokeWidth) {
+        GradientDrawable drawable = round(color, radius);
+        drawable.setStroke(strokeWidth, strokeColor);
+        return drawable;
+    }
+
     private int statusBarHeight() {
         int id = getResources().getIdentifier("status_bar_height", "dimen", "android");
         return id > 0 ? getResources().getDimensionPixelSize(id) : 48;
@@ -615,7 +859,7 @@ public class MainActivity extends Activity {
 
     private void styleTabs() {
         if (controlTab == null || settingsTab == null || monitorTab == null || bridgeTab == null) return;
-        controlTab.setText(t("Bediening", "Controls", "Bedienung"));
+        controlTab.setText("Home");
         monitorTab.setText(t("Monitoring", "Monitor"));
         bridgeTab.setText("Bridge");
         settingsTab.setText(t("Instellingen", "Settings", "Einstellungen"));
@@ -660,15 +904,45 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void toggleShowGarage() {
+        showGarage = !showGarage;
+        prefs().edit().putBoolean("show_garage", showGarage).apply();
+        if (showGarageButton != null) {
+            showGarageButton.setText(showGarage ? t("Parkeergarage tonen: aan", "Show parking garage: on", "Parkgarage anzeigen: ein") : t("Parkeergarage tonen: uit", "Show parking garage: off", "Parkgarage anzeigen: aus"));
+        }
+    }
+
+    private void toggleAdminMode() {
+        adminMode = !adminMode;
+        prefs().edit().putBoolean("admin_mode", adminMode).apply();
+        if (adminModeButton != null) {
+            adminModeButton.setText(adminMode
+                    ? t("Appmodus: beheerder", "App mode: admin", "App-Modus: Administrator")
+                    : t("Appmodus: gebruiker", "App mode: user", "App-Modus: Benutzer"));
+        }
+        toast(adminMode
+                ? t("Beheerdermodus actief", "Admin mode active", "Administratormodus aktiv")
+                : t("Gebruikersmodus actief", "User mode active", "Benutzermodus aktiv"));
+    }
+
     private void saveSettings() {
         String name = appNameInput.getText().toString().trim();
         if (name.isEmpty()) name = "Comelit dooropener";
+        if (name.length() > MAX_APP_NAME_LENGTH) name = name.substring(0, MAX_APP_NAME_LENGTH).trim();
         prefs().edit()
                 .putString("app_name", name)
                 .putString("language", language)
                 .putString("connection_mode", connectionMode)
                 .putBoolean("show_floor_door", showFloorDoor)
+                .putBoolean("show_garage", showGarage)
+                .putString("garage_entity_id", clean(garageEntityInput == null ? garageEntityId() : garageEntityInput.getText().toString()))
+                .putString("settings_pin", cleanPin(settingsPinInput == null ? prefs().getString("settings_pin", DEFAULT_SETTINGS_PIN) : settingsPinInput.getText().toString()))
+                .putBoolean("admin_mode", adminMode)
                 .putInt("doorbell_repeat_count", doorbellRepeatCount())
+                .putInt("doorbell_notification_seconds", doorbellNotificationSeconds())
+                .putInt("manual_open_repeat_count", manualOpenRepeatCount())
+                .putInt("auto_open_repeat_count", autoOpenRepeatCount())
+                .putInt("open_repeat_delay_ms", openRepeatDelayMs())
                 .apply();
         if (internalUrlInput != null) {
             prefs().edit()
@@ -729,12 +1003,18 @@ public class MainActivity extends Activity {
         return url;
     }
 
+    private String cleanPin(String pin) {
+        pin = pin == null ? "" : pin.trim();
+        if (pin.isEmpty()) return DEFAULT_SETTINGS_PIN;
+        return pin.length() > 8 ? pin.substring(0, 8) : pin;
+    }
+
     private String appName() {
         return prefs().getString("app_name", "Comelit dooropener");
     }
 
     private String appTitleText() {
-        return appName() + " - " + BuildConfig.VERSION_NAME;
+        return appName().toUpperCase(Locale.ROOT);
     }
 
     private void migrateDefaultAppName() {
@@ -759,7 +1039,7 @@ public class MainActivity extends Activity {
         String url = activeUrl();
         String token = token();
         if (url.isEmpty() || token.isEmpty()) {
-            if (statusLine != null) statusLine.setText(t("Vul URL en token in bij Instellingen.", "Enter URL and token in Settings."));
+            setConnectionStatus(t("Vul URL en token in bij Instellingen.", "Enter URL and token in Settings.", "URL und Token in den Einstellungen eintragen."));
             return;
         }
         executor.execute(() -> {
@@ -781,18 +1061,75 @@ public class MainActivity extends Activity {
                 String finalUsedUrl = usedUrl;
                 runOnUiThread(() -> {
                     if ("auto".equals(connectionMode)) prefs().edit().putString("ha_last_working_url", finalUsedUrl).apply();
-                    if (statusLine != null) statusLine.setText(t("Verbonden met Home Assistant", "Connected to Home Assistant") + ("auto".equals(connectionMode) ? "\n" + (finalUsedUrl.startsWith("https://") ? t("Via externe URL", "Via external URL") : t("Via interne URL", "Via internal URL")) : ""));
-                    if (entryStatus != null) entryStatus.setText(t("Bel hoofdingang", "Main entrance bell") + "\n" + pretty(entry.optString("state")));
-                    if (floorStatus != null && floor != null) floorStatus.setText(t("Bel etage/appartement", "Floor/apartment bell") + "\n" + pretty(floor.optString("state")));
-                    if (heartbeatStatus != null) heartbeatStatus.setText("Bridge\n" + pretty(heart.optString("state")));
+                    setConnectionStatus(homeAssistantStatusText(finalUsedUrl));
+                    String entryText = pretty(entry.optString("state"));
+                    String bridgeText = pretty(heart.optString("state"));
+                    if (entryStatus != null) entryStatus.setText(t("Hoofdingang", "Entrance", "Eingang") + ": " + entryText);
+                    if (floorStatus != null && floor != null) floorStatus.setText(t("Etage", "Floor", "Etage") + ": " + pretty(floor.optString("state")));
+                    if (heartbeatStatus != null) heartbeatStatus.setText("Bridge: " + bridgeText);
                     updateAutoOpenUi(autoOpenMode());
+                    updateHeaderSummary(entry.optString("state"), heart.optString("state"), autoOpenMode());
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
-                    if (statusLine != null) statusLine.setText(t("Geen verbinding: ", "No connection: ") + e.getMessage());
+                    setConnectionStatus(t("Geen verbinding: ", "No connection: ", "Keine Verbindung: ") + e.getMessage());
                 });
             }
         });
+    }
+
+    private void setConnectionStatus(String value) {
+        if (headerStatus != null) headerStatus.setText(value);
+        if (statusLine != null) statusLine.setText(value);
+    }
+
+    private void updateHeaderSummary(String entryState, String bridgeState, String autoOpenMode) {
+        if (headerSummary == null) return;
+        String text = entryStatusText(entryState) +
+                " · " + bridgeStatusText(bridgeState) +
+                " · " + autoOpenStatusText(autoOpenMode);
+        SpannableString styled = new SpannableString(text);
+        colorSymbol(styled, text, "○", Color.rgb(185, 194, 201));
+        colorSymbol(styled, text, "●", Color.rgb(226, 145, 46));
+        colorSymbol(styled, text, "✓", Color.rgb(116, 214, 144));
+        colorSymbol(styled, text, "!", Color.rgb(226, 145, 46));
+        colorSymbol(styled, text, "✕", Color.rgb(230, 86, 75));
+        colorSymbol(styled, text, "①", Color.rgb(226, 145, 46));
+        colorSymbol(styled, text, "⚠", Color.rgb(226, 145, 46));
+        headerSummary.setText(styled);
+    }
+
+    private void colorSymbol(SpannableString text, String source, String symbol, int color) {
+        int start = source.indexOf(symbol);
+        if (start < 0) return;
+        text.setSpan(new ForegroundColorSpan(color), start, start + symbol.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    }
+
+    private String entryStatusText(String state) {
+        boolean ringing = "on".equalsIgnoreCase(state);
+        return t("Hoofdingang", "Entrance", "Eingang") + " " + (ringing ? "●" : "○");
+    }
+
+    private String bridgeStatusText(String state) {
+        boolean active = "on".equalsIgnoreCase(state);
+        return "Bridge " + (active ? "✓" : "!");
+    }
+
+    private String autoOpenStatusText(String mode) {
+        if (AUTO_OPEN_ALWAYS.equals(mode)) return "Auto-open ⚠";
+        if (AUTO_OPEN_TIMED.equals(mode)) return "Auto-open " + autoOpenUntilText(prefs().getLong("auto_open_until_ms", 0));
+        if (AUTO_OPEN_ONCE.equals(mode)) return "Auto-open ①";
+        return "Auto-open ✕";
+    }
+
+    private String homeAssistantStatusText(String usedUrl) {
+        String route;
+        if (usedUrl != null && usedUrl.startsWith("https://")) {
+            route = t("extern", "external", "extern");
+        } else {
+            route = t("intern", "internal", "intern");
+        }
+        return t("Verbinding", "Connection", "Verbindung") + ": " + route;
     }
 
     private JSONObject[] readDoorStates(String url, String token) {
@@ -987,14 +1324,17 @@ public class MainActivity extends Activity {
                 JSONObject status = HaClient.getJson(bridgeApiUrl("/api/status"));
                 runOnUiThread(() -> {
                     if (statusLine != null) {
+                        String lastBusSeen = updateLastBusSeenText(status);
                         statusLine.setText(
                                 t("Bridge online", "Bridge online") +
                                 "\nFirmware: " + status.optString("fw", "-") +
                                 "\nWiFi: " + status.optBoolean("wifi") + "  RSSI: " + status.optInt("rssi") +
                                 "\nMQTT: " + status.optBoolean("mqtt") +
                                 "\nTemp: " + status.optDouble("temp_c") + " C" +
+                                "\n" + t("Laatste busactiviteit: ", "Last bus activity: ", "Letzte Busaktivität: ") + lastBusSeen +
                                 "\n" + t("Laatste buscode: ", "Last bus code: ") + status.optInt("dbg_last_code") +
                                 "\n" + t("Laatste adres: ", "Last address: ") + status.optInt("dbg_last_addr") +
+                                previousBusActivitiesText() +
                                 "\nDecode OK: " + status.optInt("dbg_decode_ok") +
                                 "\n" + t("Checksum fouten: ", "Checksum errors: ") + status.optInt("dbg_checksum_fail") +
                                 "\n" + t("Adres mismatch: ", "Address mismatch: ") + status.optInt("dbg_addr_mismatch") +
@@ -1010,6 +1350,74 @@ public class MainActivity extends Activity {
         });
     }
 
+    private String updateLastBusSeenText(JSONObject status) {
+        String signature =
+                status.optInt("dbg_last_code") + ":" +
+                status.optInt("dbg_last_addr") + ":" +
+                status.optInt("dbg_decode_ok") + ":" +
+                status.optInt("dbg_checksum_fail") + ":" +
+                status.optInt("dbg_addr_mismatch") + ":" +
+                status.optInt("dbg_mqtt_published");
+        SharedPreferences prefs = prefs();
+        String previous = prefs.getString("monitor_last_bus_signature", "");
+        long seenAt = prefs.getLong("monitor_last_bus_seen_at", 0);
+        int currentCode = status.optInt("dbg_last_code", 0);
+        int currentAddr = status.optInt("dbg_last_addr", 0);
+        boolean hasBusData = status.optInt("dbg_last_code", 0) > 0 || status.optInt("dbg_decode_ok", 0) > 0;
+        if (hasBusData && !signature.equals(previous)) {
+            long previousSeenAt = prefs.getLong("monitor_last_bus_seen_at", 0);
+            int previousCode = prefs.getInt("monitor_last_bus_code", 0);
+            int previousAddr = prefs.getInt("monitor_last_bus_addr", 0);
+            SharedPreferences.Editor edit = prefs.edit();
+            if (previousSeenAt > 0 && !previous.isEmpty()) {
+                edit.putLong("monitor_prev_bus_2_seen_at", prefs.getLong("monitor_prev_bus_1_seen_at", 0));
+                edit.putInt("monitor_prev_bus_2_code", prefs.getInt("monitor_prev_bus_1_code", 0));
+                edit.putInt("monitor_prev_bus_2_addr", prefs.getInt("monitor_prev_bus_1_addr", 0));
+                edit.putLong("monitor_prev_bus_1_seen_at", previousSeenAt);
+                edit.putInt("monitor_prev_bus_1_code", previousCode);
+                edit.putInt("monitor_prev_bus_1_addr", previousAddr);
+            }
+            seenAt = System.currentTimeMillis();
+            edit
+                    .putString("monitor_last_bus_signature", signature)
+                    .putLong("monitor_last_bus_seen_at", seenAt)
+                    .putInt("monitor_last_bus_code", currentCode)
+                    .putInt("monitor_last_bus_addr", currentAddr)
+                    .apply();
+        }
+        if (seenAt <= 0) return t("nog niet gezien", "not seen yet", "noch nicht gesehen");
+        return android.text.format.DateFormat.getDateFormat(this).format(new java.util.Date(seenAt)) +
+                " " +
+                android.text.format.DateFormat.getTimeFormat(this).format(new java.util.Date(seenAt));
+    }
+
+    private String previousBusActivitiesText() {
+        SharedPreferences prefs = prefs();
+        String first = busActivityLine(
+                prefs.getLong("monitor_prev_bus_1_seen_at", 0),
+                prefs.getInt("monitor_prev_bus_1_code", 0),
+                prefs.getInt("monitor_prev_bus_1_addr", 0));
+        String second = busActivityLine(
+                prefs.getLong("monitor_prev_bus_2_seen_at", 0),
+                prefs.getInt("monitor_prev_bus_2_code", 0),
+                prefs.getInt("monitor_prev_bus_2_addr", 0));
+        if (first.isEmpty() && second.isEmpty()) return "";
+        StringBuilder text = new StringBuilder();
+        text.append("\n").append(t("Vorige busactiviteiten:", "Previous bus activities:", "Vorherige Busaktivitäten:"));
+        if (!first.isEmpty()) text.append("\n1. ").append(first);
+        if (!second.isEmpty()) text.append("\n2. ").append(second);
+        return text.toString();
+    }
+
+    private String busActivityLine(long seenAt, int code, int address) {
+        if (seenAt <= 0) return "";
+        String date = android.text.format.DateFormat.getDateFormat(this).format(new java.util.Date(seenAt));
+        String time = android.text.format.DateFormat.getTimeFormat(this).format(new java.util.Date(seenAt));
+        return date + " " + time +
+                " - " + t("code", "code", "Code") + " " + code +
+                ", " + t("adres", "address", "Adresse") + " " + address;
+    }
+
     private String pretty(String state) {
         if ("on".equalsIgnoreCase(state)) return t("Actief", "Active");
         if ("off".equalsIgnoreCase(state)) return t("Rust", "Idle");
@@ -1020,7 +1428,33 @@ public class MainActivity extends Activity {
     private void openDoor() {
         clearRingNotification();
         appendDoorbellHistory(t("Deur geopend", "Door opened", "Tür geöffnet"), false);
-        callButton(HaClient.OPEN_DOOR, t("Deur openen verstuurd", "Open door sent", "Türöffnen gesendet"));
+        int attempts = manualOpenRepeatCount();
+        callButtonRepeated(HaClient.OPEN_DOOR, t("Deur openen verstuurd", "Open door sent", "Türöffnen gesendet"), attempts, openRepeatDelayMs());
+    }
+
+    private void openGarageDoor() {
+        callService(
+                "switch",
+                "turn_on",
+                garageEntityId(),
+                t("Parkeergarage openen verstuurd", "Parking garage command sent", "Parkgarage-Befehl gesendet"),
+                () -> {
+                    playGarageNotificationSound();
+                    appendAppHistory(t("Parkeergarage geopend", "Parking garage opened", "Parkgarage geöffnet"));
+                });
+    }
+
+    private String garageEntityId() {
+        return prefs().getString("garage_entity_id", "switch.tasmota_2").trim();
+    }
+
+    private void playGarageNotificationSound() {
+        try {
+            Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            Ringtone ringtone = RingtoneManager.getRingtone(this, sound);
+            if (ringtone != null) ringtone.play();
+        } catch (Exception ignored) {
+        }
     }
 
     private void dismissRing() {
@@ -1099,6 +1533,46 @@ public class MainActivity extends Activity {
         }
     }
 
+    private int doorbellNotificationSeconds() {
+        if (doorbellNotificationSecondsInput == null) return Math.max(30, Math.min(300, prefs().getInt("doorbell_notification_seconds", 120)));
+        try {
+            int value = Integer.parseInt(doorbellNotificationSecondsInput.getText().toString().trim());
+            return Math.max(30, Math.min(300, value));
+        } catch (Exception ignored) {
+            return 120;
+        }
+    }
+
+    private int manualOpenRepeatCount() {
+        if (manualOpenRepeatInput == null) return Math.max(1, Math.min(5, prefs().getInt("manual_open_repeat_count", 2)));
+        try {
+            int value = Integer.parseInt(manualOpenRepeatInput.getText().toString().trim());
+            return Math.max(1, Math.min(5, value));
+        } catch (Exception ignored) {
+            return 2;
+        }
+    }
+
+    private int autoOpenRepeatCount() {
+        if (autoOpenRepeatInput == null) return Math.max(1, Math.min(3, prefs().getInt("auto_open_repeat_count", 1)));
+        try {
+            int value = Integer.parseInt(autoOpenRepeatInput.getText().toString().trim());
+            return Math.max(1, Math.min(3, value));
+        } catch (Exception ignored) {
+            return 1;
+        }
+    }
+
+    private int openRepeatDelayMs() {
+        if (openRepeatDelayInput == null) return Math.max(300, Math.min(2000, prefs().getInt("open_repeat_delay_ms", 700)));
+        try {
+            int value = Integer.parseInt(openRepeatDelayInput.getText().toString().trim());
+            return Math.max(300, Math.min(2000, value));
+        } catch (Exception ignored) {
+            return 700;
+        }
+    }
+
     private void appendDoorbellHistory(String message, boolean countRing) {
         String time = android.text.format.DateFormat.getTimeFormat(this).format(new java.util.Date());
         String entry = time + " - " + message;
@@ -1114,6 +1588,22 @@ public class MainActivity extends Activity {
         if (countRing) editor.putInt("doorbell_ring_count", prefs().getInt("doorbell_ring_count", 0) + 1);
         editor.putBoolean("doorbell_pending_handled", true);
         editor.apply();
+        if (doorbellHistory != null) doorbellHistory.setText(doorbellHistoryText());
+        refreshServiceNotification();
+    }
+
+    private void appendAppHistory(String message) {
+        String time = android.text.format.DateFormat.getTimeFormat(this).format(new java.util.Date());
+        String entry = time + " - " + message;
+        String previous = prefs().getString("doorbell_history", "");
+        String combined = previous.isEmpty() ? entry : entry + "\n" + previous;
+        String[] lines = combined.split("\\n");
+        StringBuilder trimmed = new StringBuilder();
+        for (int i = 0; i < lines.length && i < 20; i++) {
+            if (i > 0) trimmed.append('\n');
+            trimmed.append(lines[i]);
+        }
+        prefs().edit().putString("doorbell_history", trimmed.toString()).apply();
         if (doorbellHistory != null) doorbellHistory.setText(doorbellHistoryText());
         refreshServiceNotification();
     }
@@ -1163,20 +1653,160 @@ public class MainActivity extends Activity {
     }
 
     private String doorbellHistoryText() {
+        return doorbellHistoryText(5);
+    }
+
+    private String fullDoorbellHistoryText() {
+        return doorbellHistoryText(20);
+    }
+
+    private String doorbellHistoryText(int maxLines) {
         int count = prefs().getInt("doorbell_ring_count", 0);
         String history = prefs().getString("doorbell_history", "");
         String total = t("Aantal keer aangebeld: ", "Times rung: ", "Anzahl Klingelereignisse: ") + count;
         if (history == null || history.isEmpty()) {
             return total + "\n" + t("Nog geen belmomenten.", "No rings yet.", "Noch keine Klingelereignisse.");
         }
-        return total + "\n\n" + translatedHistory(history);
+        String[] lines = translatedHistory(history).split("\\n");
+        StringBuilder visible = new StringBuilder();
+        for (int i = 0; i < lines.length && i < maxLines; i++) {
+            if (i > 0) visible.append('\n');
+            visible.append(lines[i]);
+        }
+        if (lines.length > maxLines) {
+            visible.append("\n").append(t("... meer in volledige geschiedenis", "... more in full history", "... mehr im vollständigen Verlauf"));
+        }
+        return total + "\n\n" + visible;
+    }
+
+    private void showFullDoorbellHistory() {
+        LinearLayout dialogContent = new LinearLayout(this);
+        dialogContent.setOrientation(LinearLayout.VERTICAL);
+        dialogContent.setPadding(dp(18), dp(16), dp(18), 0);
+        dialogContent.setBackgroundColor(PANEL);
+
+        TextView title = body(t("Belgeschiedenis", "Doorbell history", "Klingelverlauf"));
+        title.setTextSize(19);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setTextColor(TEXT);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
+        titleLp.setMargins(0, 0, 0, dp(8));
+        dialogContent.addView(title, titleLp);
+
+        TextView count = body(t("Aantal keer aangebeld: ", "Times rung: ", "Anzahl Klingelereignisse: ")
+                + prefs().getInt("doorbell_ring_count", 0));
+        count.setTextSize(14);
+        count.setTextColor(MUTED);
+        LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(-1, -2);
+        countLp.setMargins(0, 0, 0, dp(12));
+        dialogContent.addView(count, countLp);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(PANEL);
+        scroll.addView(fullDoorbellHistoryRows());
+        dialogContent.addView(scroll, new LinearLayout.LayoutParams(-1, dp(430)));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(dialogContent)
+                .setPositiveButton(t("Sluiten", "Close", "Schließen"), null)
+                .show();
+        if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawable(round(PANEL, 22));
+        Button close = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        if (close != null) close.setTextColor(ACCENT);
+    }
+
+    private LinearLayout fullDoorbellHistoryRows() {
+        LinearLayout rows = new LinearLayout(this);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        String history = prefs().getString("doorbell_history", "");
+        if (history == null || history.isEmpty()) {
+            TextView empty = body(t("Nog geen belmomenten.", "No rings yet.", "Noch keine Klingelereignisse."));
+            empty.setTextSize(15);
+            rows.addView(empty);
+            return rows;
+        }
+
+        String[] lines = history.split("\\n");
+        for (int i = 0; i < lines.length && i < 30; i++) {
+            rows.addView(historyRow(lines[i]));
+        }
+        return rows;
+    }
+
+    private LinearLayout historyRow(String rawLine) {
+        String time = "";
+        String message = rawLine;
+        int marker = rawLine.indexOf(" - ");
+        if (marker >= 0) {
+            time = rawLine.substring(0, marker);
+            message = rawLine.substring(marker + 3);
+        }
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.TOP);
+        row.setPadding(0, dp(6), 0, dp(6));
+
+        TextView timeView = body(time);
+        timeView.setTextSize(14);
+        timeView.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        timeView.setTextColor(MUTED);
+        timeView.setGravity(android.view.Gravity.RIGHT);
+        LinearLayout.LayoutParams timeLp = new LinearLayout.LayoutParams(dp(58), -2);
+        row.addView(timeView, timeLp);
+
+        TextView messageView = body(translateHistoryMessage(message));
+        messageView.setTextSize(15);
+        messageView.setLineSpacing(2, 1.0f);
+        LinearLayout.LayoutParams messageLp = new LinearLayout.LayoutParams(0, -2, 1);
+        messageLp.setMargins(dp(14), 0, 0, 0);
+        row.addView(messageView, messageLp);
+
+        return row;
     }
 
     private void callButton(String entityId, String message) {
+        callButtonRepeated(entityId, message, 1, 700);
+    }
+
+    private void callService(String domain, String service, String entityId, String message) {
+        callService(domain, service, entityId, message, null);
+    }
+
+    private void callService(String domain, String service, String entityId, String message, Runnable onSuccess) {
         executor.execute(() -> {
             try {
-                HaClient.callService(activeUrl(), token(), "button", "press", entityId);
-                runOnUiThread(() -> toast(message));
+                HaClient.callService(activeUrl(), token(), domain, service, entityId);
+                runOnUiThread(() -> {
+                    toast(message);
+                    if (onSuccess != null) onSuccess.run();
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> toast(t("Mislukt: ", "Failed: ", "Fehlgeschlagen: ") + e.getMessage()));
+            }
+        });
+    }
+
+    private void callButtonRepeated(String entityId, String message, int attempts, int delayMs) {
+        executor.execute(() -> {
+            boolean sent = false;
+            Exception last = null;
+            try {
+                for (int i = 0; i < attempts; i++) {
+                    if (i > 0) Thread.sleep(delayMs);
+                    try {
+                        HaClient.callService(activeUrl(), token(), "button", "press", entityId);
+                        sent = true;
+                    } catch (Exception e) {
+                        last = e;
+                    }
+                }
+                if (!sent && last != null) throw last;
+                String suffix = attempts > 1 ? " (" + attempts + "x)" : "";
+                runOnUiThread(() -> toast(message + suffix));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                runOnUiThread(() -> toast(t("Mislukt: onderbroken", "Failed: interrupted", "Fehlgeschlagen: unterbrochen")));
             } catch (Exception e) {
                 runOnUiThread(() -> toast(t("Mislukt: ", "Failed: ", "Fehlgeschlagen: ") + e.getMessage()));
             }
@@ -1220,31 +1850,55 @@ public class MainActivity extends Activity {
     }
 
     private void askTimedAutoOpenMinutes() {
+        LinearLayout dialogContent = new LinearLayout(this);
+        dialogContent.setOrientation(LinearLayout.VERTICAL);
+        dialogContent.setPadding(dp(18), dp(12), dp(18), 0);
+        TextView question = body(t(
+                "Hoeveel minuten moet automatisch openen actief blijven?",
+                "For how many minutes should auto-open stay active?",
+                "Wie viele Minuten soll das automatische Öffnen aktiv bleiben?"));
+        question.setTextColor(Color.rgb(32, 37, 41));
+        dialogContent.addView(question);
         EditText minutesInput = input(t("Aantal minuten", "Minutes"), false, false);
         minutesInput.setInputType(InputType.TYPE_CLASS_NUMBER);
         minutesInput.setText(String.valueOf(prefs().getInt("auto_open_timed_minutes", 60)));
-        new AlertDialog.Builder(this)
+        dialogContent.addView(minutesInput);
+        TextView orText = body(t("Of vul een eindtijd in:", "Or enter an end time:", "Oder eine Endzeit eingeben:"));
+        orText.setTextColor(Color.rgb(32, 37, 41));
+        LinearLayout.LayoutParams orLp = new LinearLayout.LayoutParams(-1, -2);
+        orLp.setMargins(0, dp(14), 0, 0);
+        orText.setLayoutParams(orLp);
+        dialogContent.addView(orText);
+        EditText untilInput = input(t("Tot tijdstip, bijvoorbeeld 22:30", "Until time, for example 22:30", "Bis Uhrzeit, zum Beispiel 22:30"), false, false);
+        untilInput.setInputType(InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_TIME);
+        dialogContent.addView(untilInput);
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(t("Tijdelijk automatisch openen", "Timed auto-open"))
-                .setMessage(t(
-                        "Hoeveel minuten moet automatisch openen actief blijven?",
-                        "For how many minutes should auto-open stay active?"))
-                .setView(minutesInput)
+                .setView(dialogContent)
                 .setNegativeButton(t("Annuleren", "Cancel"), null)
-                .setPositiveButton(t("Inschakelen", "Enable"), (dialog, which) -> {
+                .setPositiveButton(t("Inschakelen", "Enable"), (clickedDialog, which) -> {
+                    long until = parseUntilTime(untilInput.getText().toString());
                     int minutes = parseMinutes(minutesInput.getText().toString());
-                    confirmTimedAutoOpen(minutes);
+                    if (until <= 0) until = System.currentTimeMillis() + (minutes * 60_000L);
+                    confirmTimedAutoOpen(until, minutes);
                 })
                 .show();
+        Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        Button negative = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+        if (positive != null) positive.setTextColor(ACCENT);
+        if (negative != null) negative.setTextColor(ACCENT);
     }
 
-    private void confirmTimedAutoOpen(int minutes) {
+    private void confirmTimedAutoOpen(long until, int minutes) {
+        String untilText = autoOpenUntilText(until);
         new AlertDialog.Builder(this)
                 .setTitle(t("Tijdelijk automatisch openen?", "Timed auto-open?"))
                 .setMessage(t(
-                        "De deur wordt dan automatisch geopend bij elke bel gedurende " + minutes + " minuten. Daarna schakelt de app automatisch openen weer uit.",
-                        "The door will open automatically on each ring for " + minutes + " minutes. After that the app turns auto-open off again."))
+                        "De deur wordt dan automatisch geopend bij elke bel tot " + untilText + ". Daarna schakelt de app automatisch openen weer uit.",
+                        "The door will open automatically on each ring until " + untilText + ". After that the app turns auto-open off again.",
+                        "Die Tür wird bei jedem Klingeln bis " + untilText + " automatisch geöffnet. Danach schaltet die App das automatische Öffnen wieder aus."))
                 .setNegativeButton(t("Annuleren", "Cancel"), null)
-                .setPositiveButton(t("Inschakelen", "Enable"), (dialog, which) -> setTimedAutoOpen(minutes))
+                .setPositiveButton(t("Inschakelen", "Enable"), (dialog, which) -> setTimedAutoOpen(until, minutes))
                 .show();
     }
 
@@ -1256,8 +1910,28 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void setTimedAutoOpen(int minutes) {
-        long until = System.currentTimeMillis() + (minutes * 60_000L);
+    private long parseUntilTime(String value) {
+        value = value == null ? "" : value.trim();
+        if (value.isEmpty()) return 0;
+        try {
+            String[] parts = value.replace('.', ':').split(":");
+            if (parts.length < 2) return 0;
+            int hour = Math.max(0, Math.min(23, Integer.parseInt(parts[0].trim())));
+            int minute = Math.max(0, Math.min(59, Integer.parseInt(parts[1].trim())));
+            java.util.Calendar calendar = java.util.Calendar.getInstance();
+            calendar.set(java.util.Calendar.HOUR_OF_DAY, hour);
+            calendar.set(java.util.Calendar.MINUTE, minute);
+            calendar.set(java.util.Calendar.SECOND, 0);
+            calendar.set(java.util.Calendar.MILLISECOND, 0);
+            long until = calendar.getTimeInMillis();
+            if (until <= System.currentTimeMillis()) until += 24 * 60 * 60 * 1000L;
+            return until;
+        } catch (Exception ignored) {
+            return 0;
+        }
+    }
+
+    private void setTimedAutoOpen(long until, int minutes) {
         prefs().edit()
                 .putString("auto_open_mode", AUTO_OPEN_TIMED)
                 .putInt("auto_open_timed_minutes", minutes)
@@ -1299,9 +1973,16 @@ public class MainActivity extends Activity {
         return prefs().getString("auto_open_mode", AUTO_OPEN_OFF);
     }
 
+    private String autoOpenShortText(String mode) {
+        if (AUTO_OPEN_ALWAYS.equals(mode)) return t("Permanent", "Permanent", "Dauerhaft");
+        if (AUTO_OPEN_TIMED.equals(mode)) return t("Tijdelijk", "Timed", "Zeitlich");
+        if (AUTO_OPEN_ONCE.equals(mode)) return t("Eenmalig", "Once", "Einmalig");
+        return t("Uit", "Off", "Aus");
+    }
+
     private void updateAutoOpenUi(String mode) {
         if (AUTO_OPEN_ALWAYS.equals(mode)) {
-            updateAutoOpenUiText(t("PERMANENT AAN - deur opent bij elke bel", "PERMANENTLY ON - door opens on every ring"),
+            updateAutoOpenUiText(t("Permanent", "Permanent", "Dauerhaft"),
                     t("Automatisch openen uitschakelen of wijzigen", "Turn off or change auto-open"));
         } else if (AUTO_OPEN_TIMED.equals(mode)) {
             long until = prefs().getLong("auto_open_until_ms", 0);
@@ -1309,19 +1990,19 @@ public class MainActivity extends Activity {
                 setAutoOpenMode(AUTO_OPEN_OFF);
                 return;
             }
-            updateAutoOpenUiText(t("TIJDELIJK AAN - tot ", "TIMED ON - until ") + autoOpenUntilText(until),
+            updateAutoOpenUiText(t("Tijdelijk tot ", "Timed until ", "Zeitlich bis ") + autoOpenUntilText(until),
                     t("Automatisch openen uitschakelen of wijzigen", "Turn off or change auto-open"));
         } else if (AUTO_OPEN_ONCE.equals(mode)) {
-            updateAutoOpenUiText(t("EENMALIG AAN - opent bij volgende bel", "ONCE - opens on next ring"),
+            updateAutoOpenUiText(t("Eenmalig", "Once", "Einmalig"),
                     t("Automatisch openen uitschakelen of wijzigen", "Turn off or change auto-open"));
         } else {
-            updateAutoOpenUiText(t("UIT", "OFF"),
+            updateAutoOpenUiText(t("Uit", "Off", "Aus"),
                     t("Automatisch openen kiezen", "Choose auto-open mode"));
         }
     }
 
     private void updateAutoOpenUiText(String status, String button) {
-        if (ringStatus != null) ringStatus.setText(t("Automatisch openen", "Auto-open") + "\n" + status);
+        if (ringStatus != null) ringStatus.setText(t("Auto-open", "Auto-open", "Auto-Öffnen") + ": " + status);
         if (ringButton != null) ringButton.setText(button);
     }
 
@@ -1346,16 +2027,28 @@ public class MainActivity extends Activity {
 
     private void toggleMonitor() {
         if (monitorRunning) {
-            stopService(new Intent(this, DoorMonitorService.class));
-            monitorRunning = false;
-            prefs().edit().putBoolean("door_notifications_enabled", false).apply();
-            if (monitorButton != null) monitorButton.setText(t("Belmeldingen aanzetten", "Turn doorbell alerts on"));
+            new AlertDialog.Builder(this)
+                    .setTitle(t("Belmeldingen uitzetten?", "Turn doorbell alerts off?", "Klingelmeldungen ausschalten?"))
+                    .setMessage(t(
+                            "Als je dit uitzet, hoor je geen deurbelmelding meer via deze app totdat je belmeldingen weer aanzet.",
+                            "If you turn this off, this app will no longer alert you when the doorbell rings until you turn alerts on again.",
+                            "Wenn du dies ausschaltest, meldet diese App kein Klingeln mehr, bis du die Klingelmeldungen wieder einschaltest."))
+                    .setNegativeButton(t("Annuleren", "Cancel"), null)
+                    .setPositiveButton(t("Uitzetten", "Turn off", "Ausschalten"), (dialog, which) -> disableMonitor())
+                    .show();
         } else {
             startForegroundService(new Intent(this, DoorMonitorService.class));
             monitorRunning = true;
             prefs().edit().putBoolean("door_notifications_enabled", true).apply();
             if (monitorButton != null) monitorButton.setText(t("Belmeldingen uitzetten", "Turn doorbell alerts off"));
         }
+    }
+
+    private void disableMonitor() {
+        stopService(new Intent(this, DoorMonitorService.class));
+        monitorRunning = false;
+        prefs().edit().putBoolean("door_notifications_enabled", false).apply();
+        if (monitorButton != null) monitorButton.setText(t("Belmeldingen aanzetten", "Turn doorbell alerts on"));
     }
 
     private void requestNotifications() {
@@ -1387,7 +2080,7 @@ public class MainActivity extends Activity {
     private String translateHistoryLine(String line) {
         int marker = line.indexOf(" - ");
         if (marker < 0) return translateHistoryMessage(line);
-        return line.substring(0, marker + 3) + translateHistoryMessage(line.substring(marker + 3));
+        return line.substring(0, marker) + "  |  " + translateHistoryMessage(line.substring(marker + 3));
     }
 
     private String translateHistoryMessage(String message) {
@@ -1573,5 +2266,9 @@ public class MainActivity extends Activity {
 
     private void toast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 }
