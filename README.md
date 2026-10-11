@@ -11,6 +11,9 @@ Android app for controlling a Simplebus2 Bridge through Home Assistant.
 - Dutch, English and German interface.
 - Internal/external Home Assistant URL fallback.
 - Optional bridge proxy settings for remote bridge configuration.
+- Admin/User mode with PIN protection for settings and bridge screens.
+- Optional parking garage/extra Home Assistant switch control.
+- Bus monitor with latest bridge activity and recent activity history.
 - Manual and daily GitHub update checks.
 
 ## Configuration
@@ -22,13 +25,15 @@ The APK does not include private Home Assistant URLs, tokens or proxy settings. 
 - Long-lived Home Assistant access token
 - Bridge web/API URL
 - Optional bridge proxy URL and token
+- Optional parking garage switch entity
+- Administrator PIN
 
 ## Current release
 
-- Version: `0.1.119`
-- Version code: `120`
-- APK: `Comelit-dooropener-0.1.119-release.apk`
-- User guide: [`Comelit-dooropener-0.1.119-user-guide.pdf`](docs/Comelit-dooropener-0.1.119-user-guide.pdf)
+- Version: `0.2.0`
+- Version code: `200`
+- APK: `Comelit-dooropener-0.2.0-release.apk`
+- User guide: [`Comelit-dooropener-0.2.0-user-guide.pdf`](docs/Comelit-dooropener-0.2.0-user-guide.pdf)
 
 The release APK does not contain Frank's private Home Assistant URLs, access tokens, bridge proxy tokens or local network settings. These are configured on the phone after installation.
 
@@ -45,12 +50,12 @@ Example `version.json`:
 
 ```json
 {
-  "versionCode": 120,
-  "versionName": "0.1.119",
-  "apkUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.1.119/Comelit-dooropener-0.1.119-release.apk",
-  "guideUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.1.119/Comelit-dooropener-0.1.119-user-guide.pdf",
-  "releaseUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/tag/v0.1.119",
-  "notes": "Adds a polished information button in the app header with GitHub and user guide links. Includes a trilingual English/Dutch/German user guide with the default administrator PIN and safer first-start instructions."
+  "versionCode": 200,
+  "versionName": "0.2.0",
+  "apkUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.2.0/Comelit-dooropener-0.2.0-release.apk",
+  "guideUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.2.0/Comelit-dooropener-0.2.0-user-guide.pdf",
+  "releaseUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/tag/v0.2.0",
+  "notes": "Adds admin/user mode with PIN protection, optional parking garage control, improved bus monitor history, safer daily controls, updated save behavior documentation and a refreshed trilingual user guide."
 }
 ```
 

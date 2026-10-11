@@ -4,8 +4,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 
-OUTPUT = r"C:\Users\fgel\Documents\Codex\2026-06-07\ik-heb-deze-translator-op-bijgevoegde\outputs\Comelit-dooropener-0.1.119-user-guide.pdf"
-VERSION = "0.1.119"
+OUTPUT = r"C:\Users\fgel\Documents\Codex\2026-06-07\ik-heb-deze-translator-op-bijgevoegde\work\comelit-dooropener-github-0.1.43\docs\Comelit-dooropener-0.2.0-user-guide.pdf"
+VERSION = "0.2.0"
 DEFAULT_ADMIN_PIN = "8882"
 
 
@@ -55,8 +55,8 @@ def make_table(rows, styles, widths=None):
 def common_release_files(styles):
     return make_table([
         ["File", "Purpose"],
-        ["Comelit-dooropener-0.1.119-release.apk", "Installable Android package."],
-        ["Comelit-dooropener-0.1.119-user-guide.pdf", "This trilingual user guide."],
+        ["Comelit-dooropener-0.2.0-release.apk", "Installable Android package."],
+        ["Comelit-dooropener-0.2.0-user-guide.pdf", "This trilingual user guide."],
         ["version.json", "Public update metadata with version, APK link, guide link and release notes."],
     ], styles, widths=[72 * mm, 92 * mm])
 
@@ -117,6 +117,7 @@ def english(story, styles):
         ["Language", "Dutch, English or German."],
         ["Admin/User mode", "Admin shows all controls. User mode only shows safe daily controls."],
         ["Administrator PIN", f"Default is {DEFAULT_ADMIN_PIN}. Change it after installation."],
+        ["Saving behavior", "Button choices such as language, mode and visibility are saved immediately. URL, token, PIN and text fields are saved with Save settings."],
     ], styles))
 
     story += section("Automatic Opening", styles)
@@ -135,6 +136,7 @@ def english(story, styles):
         ["Function", "Description"],
         ["Bridge Web/API", "Configure bridge URL, optional proxy, WiFi, MQTT, address, gain and threshold."],
         ["Bus monitor", "Shows latest bus activity, previous activities and bridge debug counters. It is not a full packet analyzer."],
+        ["Unsaved fields", "After changing URL, token, PIN or other typed fields, press Save settings before leaving the screen."],
         ["GitHub updates", "The app reads version.json and can point to the latest release, APK and guide."],
         ["Security", "Keep tokens and proxy keys private. Use HTTPS for external access."],
     ], styles))
@@ -200,6 +202,7 @@ def dutch(story, styles):
         ["Taal", "Nederlands, Engels of Duits."],
         ["Beheer/Gebruiker", "Beheer toont alles. Gebruikersmodus toont alleen veilige dagelijkse bediening."],
         ["Beheerders-PIN", f"Standaard is {DEFAULT_ADMIN_PIN}. Wijzig deze na installatie."],
+        ["Opslaan", "Knopkeuzes zoals taal, modus en zichtbaarheid worden direct opgeslagen. URL, token, PIN en tekstvelden worden bewaard met Instellingen opslaan."],
     ], styles))
 
     story += section("Automatisch openen", styles)
@@ -218,6 +221,7 @@ def dutch(story, styles):
         ["Functie", "Beschrijving"],
         ["Bridge Web/API", "Configureert bridge URL, optionele proxy, WiFi, MQTT, adres, gain en threshold."],
         ["Busmonitor", "Toont laatste busactiviteit, vorige activiteiten en debugtellers van de bridge. Dit is geen volledige packet-analyzer."],
+        ["Niet-opgeslagen velden", "Druk na het wijzigen van URL, token, PIN of andere tekstvelden op Instellingen opslaan voordat u het scherm verlaat."],
         ["GitHub updates", "De app leest version.json en kan verwijzen naar de laatste release, APK en handleiding."],
         ["Beveiliging", "Houd tokens en proxy-sleutels prive. Gebruik HTTPS voor externe toegang."],
     ], styles))
@@ -283,6 +287,7 @@ def german(story, styles):
         ["Sprache", "Niederlaendisch, Englisch oder Deutsch."],
         ["Admin/Benutzer", "Admin zeigt alle Funktionen. Benutzermodus zeigt nur sichere Alltagsbedienung."],
         ["Administrator-PIN", f"Standard ist {DEFAULT_ADMIN_PIN}. Nach Installation aendern."],
+        ["Speichern", "Schaltflaechen wie Sprache, Modus und Sichtbarkeit werden sofort gespeichert. URL, Token, PIN und Textfelder werden mit Einstellungen speichern gesichert."],
     ], styles))
 
     story += section("Auto-Oeffnen", styles)
@@ -301,6 +306,7 @@ def german(story, styles):
         ["Funktion", "Beschreibung"],
         ["Bridge Web/API", "Konfiguriert Bridge URL, optionalen Proxy, WLAN, MQTT, Adresse, Gain und Threshold."],
         ["Busmonitor", "Zeigt letzte Busaktivitaet, vorherige Aktivitaeten und Debugzaehler der Bridge. Kein vollstaendiger Packet Analyzer."],
+        ["Nicht gespeicherte Felder", "Nach Aenderung von URL, Token, PIN oder anderen Textfeldern Einstellungen speichern druecken, bevor Sie die Seite verlassen."],
         ["GitHub Updates", "Die App liest version.json und kann zur letzten Release, APK und Anleitung verweisen."],
         ["Sicherheit", "Tokens und Proxy-Schluessel privat halten. Fuer externen Zugriff HTTPS verwenden."],
     ], styles))

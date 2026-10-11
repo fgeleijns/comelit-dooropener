@@ -1,8 +1,8 @@
 {
-  "versionCode": 120,
-  "versionName": "0.1.119",
-  "apkUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.1.119/Comelit-dooropener-0.1.119-release.apk",
-  "guideUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.1.119/Comelit-dooropener-0.1.119-user-guide.pdf",
-  "releaseUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/tag/v0.1.119",
-  "notes": "Adds a polished information button in the app header with GitHub and user guide links. Includes a trilingual English/Dutch/German user guide with the default administrator PIN and safer first-start instructions."
+  "versionCode": 200,
+  "versionName": "0.2.0",
+  "apkUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.2.0/Comelit-dooropener-0.2.0-release.apk",
+  "guideUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.2.0/Comelit-dooropener-0.2.0-user-guide.pdf",
+  "releaseUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/tag/v0.2.0",
+  "notes": "Adds admin/user mode with PIN protection, optional parking garage control, improved bus monitor history, safer daily controls, updated save behavior documentation and a refreshed trilingual user guide."
 }

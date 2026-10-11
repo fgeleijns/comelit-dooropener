@@ -45,7 +45,7 @@ public class MainActivity extends Activity {
     private static final int REQUEST_RINGTONE = 70;
     private static final String UPDATE_INFO_URL = "https://raw.githubusercontent.com/fgeleijns/comelit-dooropener/main/version.json";
     private static final String GITHUB_URL = "https://github.com/fgeleijns/comelit-dooropener";
-    private static final String GUIDE_URL = "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.1.119/Comelit-dooropener-0.1.119-user-guide.pdf";
+    private static final String GUIDE_URL = "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.2.0/Comelit-dooropener-0.2.0-user-guide.pdf";
     private static final long UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L;
     private static final String AUTO_OPEN_OFF = "off";
     private static final String AUTO_OPEN_ONCE = "once";
@@ -349,16 +349,7 @@ public class MainActivity extends Activity {
                 .setPositiveButton(t("Handleiding", "Guide", "Anleitung"), null)
                 .show();
         dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> openExternalUrl(GITHUB_URL));
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            if (BuildConfig.DEBUG) {
-                toast(t(
-                        "De handleiding staat pas online na de release.",
-                        "The guide is only online after the release.",
-                        "Die Anleitung ist erst nach dem Release online."));
-                return;
-            }
-            openExternalUrl(GUIDE_URL);
-        });
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> openExternalUrl(GUIDE_URL));
     }
 
     private void openExternalUrl(String url) {
@@ -498,8 +489,8 @@ public class MainActivity extends Activity {
         showGarageButton.setOnClickListener(v -> toggleShowGarage());
         content.addView(showGarageButton);
 
-        garageEntityInput = input("switch.tasmota_2", false, false);
-        garageEntityInput.setText(prefs().getString("garage_entity_id", "switch.tasmota_2"));
+        garageEntityInput = input("switch.your_garage", false, false);
+        garageEntityInput.setText(prefs().getString("garage_entity_id", ""));
         content.addView(garageEntityInput);
 
         Button ringtoneButton = secondaryButton(t("Beltoon kiezen: ", "Choose ringtone: ") + ringtoneName());
@@ -1522,7 +1513,7 @@ public class MainActivity extends Activity {
     }
 
     private String garageEntityId() {
-        return prefs().getString("garage_entity_id", "switch.tasmota_2").trim();
+        return prefs().getString("garage_entity_id", "").trim();
     }
 
     private void playGarageNotificationSound() {
