@@ -44,6 +44,8 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity {
     private static final int REQUEST_RINGTONE = 70;
     private static final String UPDATE_INFO_URL = "https://raw.githubusercontent.com/fgeleijns/comelit-dooropener/main/version.json";
+    private static final String GITHUB_URL = "https://github.com/fgeleijns/comelit-dooropener";
+    private static final String GUIDE_URL = "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.1.119/Comelit-dooropener-0.1.119-user-guide.pdf";
     private static final long UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L;
     private static final String AUTO_OPEN_OFF = "off";
     private static final String AUTO_OPEN_ONCE = "once";
@@ -223,6 +225,15 @@ public class MainActivity extends Activity {
         menuButton.setBackground(round(Color.TRANSPARENT, 18));
         menuButton.setOnClickListener(v -> showMainMenu());
         headerTop.addView(menuButton, new android.widget.FrameLayout.LayoutParams(dp(58), dp(58), android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL));
+
+        Button infoButton = baseButton("i");
+        infoButton.setTextSize(22);
+        infoButton.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        infoButton.setMinHeight(58);
+        infoButton.setPadding(0, 0, 0, 2);
+        infoButton.setBackground(round(Color.TRANSPARENT, 18));
+        infoButton.setOnClickListener(v -> showAboutDialog());
+        headerTop.addView(infoButton, new android.widget.FrameLayout.LayoutParams(dp(58), dp(58), android.view.Gravity.END | android.view.Gravity.CENTER_VERTICAL));
         header.addView(headerTop);
 
         headerStatus = body(t("Verbinden...", "Connecting...", "Verbinden..."));
@@ -290,6 +301,72 @@ public class MainActivity extends Activity {
                     if (which == 3) requestSettingsPin(this::showSettings);
                 })
                 .show();
+    }
+
+    private void showAboutDialog() {
+        int dialogText = Color.rgb(20, 28, 32);
+        int dialogMuted = Color.rgb(82, 96, 104);
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(6), dp(8), dp(6), 0);
+
+        TextView name = body(appTitleText());
+        name.setTextSize(20);
+        name.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        name.setTextColor(dialogText);
+        name.setGravity(android.view.Gravity.CENTER);
+        box.addView(name, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView version = body("v" + BuildConfig.VERSION_NAME);
+        version.setTextSize(14);
+        version.setTextColor(dialogMuted);
+        version.setGravity(android.view.Gravity.CENTER);
+        LinearLayout.LayoutParams versionLp = new LinearLayout.LayoutParams(-1, -2);
+        versionLp.setMargins(0, dp(4), 0, dp(14));
+        box.addView(version, versionLp);
+
+        TextView description = body(t(
+                "Android app voor de Simplebus2 Bridge via Home Assistant. De app bedient de entree, optionele parkeergarage, belmeldingen, automatisch openen en bridge-monitoring.",
+                "Android app for the Simplebus2 Bridge through Home Assistant. The app controls the entrance, optional parking garage, doorbell alerts, auto-open and bridge monitoring.",
+                "Android-App für die Simplebus2 Bridge über Home Assistant. Die App steuert Eingang, optionale Parkgarage, Klingelmeldungen, Auto-Öffnen und Bridge-Monitoring."));
+        description.setTextColor(dialogText);
+        description.setGravity(android.view.Gravity.CENTER);
+        box.addView(description);
+
+        TextView author = body("© Frank Geleijns");
+        author.setTextColor(dialogMuted);
+        author.setGravity(android.view.Gravity.CENTER);
+        LinearLayout.LayoutParams authorLp = new LinearLayout.LayoutParams(-1, -2);
+        authorLp.setMargins(0, dp(14), 0, 0);
+        box.addView(author, authorLp);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(t("Informatie", "Information", "Information"))
+                .setView(box)
+                .setNegativeButton(t("Sluiten", "Close", "Schließen"), null)
+                .setNeutralButton("GitHub", null)
+                .setPositiveButton(t("Handleiding", "Guide", "Anleitung"), null)
+                .show();
+        dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> openExternalUrl(GITHUB_URL));
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            if (BuildConfig.DEBUG) {
+                toast(t(
+                        "De handleiding staat pas online na de release.",
+                        "The guide is only online after the release.",
+                        "Die Anleitung ist erst nach dem Release online."));
+                return;
+            }
+            openExternalUrl(GUIDE_URL);
+        });
+    }
+
+    private void openExternalUrl(String url) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception e) {
+            toast(t("Kan link niet openen", "Cannot open link", "Link kann nicht geöffnet werden"));
+        }
     }
 
     private void requestSettingsPin(Runnable onUnlocked) {

@@ -1,8 +1,8 @@
 {
-  "versionCode": 119,
-  "versionName": "0.1.118",
-  "apkUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.1.118/Comelit-dooropener-0.1.118-release.apk",
-  "guideUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.1.118/Comelit-dooropener-0.1.118-user-guide.pdf",
-  "releaseUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/tag/v0.1.118",
-  "notes": "Updated Comelit Dooropener app with refined phone UI, portrait-only layout, persistent doorbell monitor, localized Dutch/English/German texts, doorbell history improvements, garage control, auto-open safety modes, bus monitor history and updated release documentation."
+  "versionCode": 120,
+  "versionName": "0.1.119",
+  "apkUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.1.119/Comelit-dooropener-0.1.119-release.apk",
+  "guideUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.1.119/Comelit-dooropener-0.1.119-user-guide.pdf",
+  "releaseUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/tag/v0.1.119",
+  "notes": "Adds a polished information button in the app header with GitHub and user guide links. Includes a trilingual English/Dutch/German user guide with the default administrator PIN and safer first-start instructions."
 }
