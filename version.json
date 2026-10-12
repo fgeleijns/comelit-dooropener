@@ -4,5 +4,5 @@
   "apkUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.2.0/Comelit-dooropener-0.2.0-release.apk",
   "guideUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.2.0/Comelit-dooropener-0.2.0-user-guide.pdf",
   "releaseUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/tag/v0.2.0",
-  "notes": "Adds admin/user mode with PIN protection, optional parking garage control, improved bus monitor history, safer daily controls, updated save behavior documentation and a refreshed trilingual user guide."
+  "notes": "Adds admin/user mode with PIN protection, optional parking garage control, improved bus monitor history, safer daily controls, save/discard prompts for settings, a refreshed trilingual user guide, and a fixed update check for version 0.2.0."
 }

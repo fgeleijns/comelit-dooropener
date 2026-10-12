@@ -1695,7 +1695,9 @@ public class MainActivity extends Activity {
                 String apkUrl = info.optString("apkUrl", "");
                 String releaseUrl = info.optString("releaseUrl", apkUrl);
                 String notes = info.optString("notes", "");
-                if (latestCode > BuildConfig.VERSION_CODE && !releaseUrl.isEmpty()) {
+                boolean newerByName = compareVersionName(latestName, BuildConfig.VERSION_NAME) > 0;
+                boolean newerByCodeOnly = latestName.trim().isEmpty() && latestCode > BuildConfig.VERSION_CODE;
+                if ((newerByName || newerByCodeOnly) && !releaseUrl.isEmpty()) {
                     runOnUiThread(() -> showUpdateDialog(latestName, releaseUrl, notes));
                 } else if (manual) {
                     runOnUiThread(() -> toast(t("Je gebruikt de nieuwste versie.", "You are using the latest version.")));
@@ -1704,6 +1706,40 @@ public class MainActivity extends Activity {
                 if (manual) runOnUiThread(() -> toast(t("Updatecontrole mislukt: ", "Update check failed: ") + e.getMessage()));
             }
         });
+    }
+
+    private int compareVersionName(String left, String right) {
+        String[] a = normalizeVersionName(left).split("\\.");
+        String[] b = normalizeVersionName(right).split("\\.");
+        int max = Math.max(a.length, b.length);
+        for (int i = 0; i < max; i++) {
+            int ai = i < a.length ? parseVersionPart(a[i]) : 0;
+            int bi = i < b.length ? parseVersionPart(b[i]) : 0;
+            if (ai != bi) return ai > bi ? 1 : -1;
+        }
+        return 0;
+    }
+
+    private String normalizeVersionName(String value) {
+        if (value == null) return "0";
+        String cleaned = value.trim();
+        if (cleaned.startsWith("v") || cleaned.startsWith("V")) cleaned = cleaned.substring(1);
+        return cleaned.isEmpty() ? "0" : cleaned;
+    }
+
+    private int parseVersionPart(String value) {
+        StringBuilder digits = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c >= '0' && c <= '9') digits.append(c);
+            else break;
+        }
+        if (digits.length() == 0) return 0;
+        try {
+            return Integer.parseInt(digits.toString());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     private void showUpdateDialog(String versionName, String releaseUrl, String notes) {
