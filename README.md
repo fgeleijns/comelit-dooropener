@@ -2,6 +2,14 @@
 
 Android app for controlling a Simplebus2 Bridge through Home Assistant.
 
+## Required bridge and compatibility
+
+This app is designed specifically for **Thomas (Elektroarzt)'s SimpleBus2 MQTT Bridge**: [Elektroarzt/simplebus2-mqtt-bridge](https://github.com/Elektroarzt/simplebus2-mqtt-bridge). It requires that bridge, an MQTT broker, and Home Assistant configured with the bridge's entities. It is not a standalone Comelit bus interface or a universal app for other intercom bridges.
+
+Bridge hardware and original firmware are provided by Thomas' project; they are not included with this Android app. Follow that project's documentation for compatible intercom installations and bridge setup. This app is a separate companion project and is not an official Comelit app.
+
+The latest reception diagnostics were tested with a locally modified `2.0.0-rxdiag.5` firmware derived from Thomas' bridge firmware, using a configurable decoder guard. The app falls back to the original status fields when extended diagnostic fields are unavailable; reliable reception still depends on the bridge firmware, installation and gain/threshold settings. The modified firmware is not bundled with this app release.
+
 ## Features
 
 - Door open control through Home Assistant.
