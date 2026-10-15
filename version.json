@@ -1,8 +1,8 @@
 {
-  "versionCode": 200,
-  "versionName": "0.2.0",
-  "apkUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.2.0/Comelit-dooropener-0.2.0-release.apk",
+  "versionCode": 204,
+  "versionName": "0.2.1",
+  "apkUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.2.1/Comelit-dooropener-0.2.1-release.apk",
   "guideUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/download/v0.2.0/Comelit-dooropener-0.2.0-user-guide.pdf",
-  "releaseUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/tag/v0.2.0",
-  "notes": "Adds admin/user mode with PIN protection, optional parking garage control, improved bus monitor history, safer daily controls, save/discard prompts for settings, a refreshed trilingual user guide, and a fixed update check for version 0.2.0."
+  "releaseUrl": "https://github.com/fgeleijns/comelit-dooropener/releases/tag/v0.2.1",
+  "notes": "Fixes continuous doorbell monitoring on Android 15/16, adds confirmed history clearing, improves bus message descriptions and filtering, and reduces notification and auto-open polling delays. Fixes the crash when clearing history. Settings are preserved when updating."
 }

@@ -24,6 +24,7 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class DoorMonitorService extends Service {
     static final String ACTION_STOP_RING_SOUND = "stop_ring_sound";
@@ -36,10 +37,12 @@ public class DoorMonitorService extends Service {
     private static final String AUTO_OPEN_ONCE = "once";
     private static final String AUTO_OPEN_TIMED = "timed";
     private static final String AUTO_OPEN_ALWAYS = "always";
-    private static final long AUTO_OPEN_DELAY_MS = 900;
+    private static final long AUTO_OPEN_DELAY_MS = 150;
     private static final long AUTO_OPEN_COOLDOWN_MS = 30000;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final ExecutorService autoOpenExecutor = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean pollInFlight = new AtomicBoolean(false);
     private Ringtone activeRingtone;
     private AudioAttributes ringAudioAttributes;
     private int repeatsLeft;
@@ -48,7 +51,7 @@ public class DoorMonitorService extends Service {
     private final Runnable tick = new Runnable() {
         @Override public void run() {
             poll();
-            handler.postDelayed(this, 5000);
+            handler.postDelayed(this, 1000);
         }
     };
 
@@ -60,6 +63,9 @@ public class DoorMonitorService extends Service {
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
+        // Each startForegroundService request needs acknowledgement, including
+        // refresh requests while this service is already running.
+        startForeground(SERVICE_NOTIFICATION_ID, serviceNotification());
         if (intent != null) {
             if (ACTION_STOP_RING_SOUND.equals(intent.getAction())) {
                 stopDoorbellSound();
@@ -75,6 +81,7 @@ public class DoorMonitorService extends Service {
         handler.removeCallbacksAndMessages(null);
         stopDoorbellSound();
         executor.shutdownNow();
+        autoOpenExecutor.shutdownNow();
         super.onDestroy();
     }
 
@@ -95,8 +102,9 @@ public class DoorMonitorService extends Service {
         SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
         String token = prefs.getString("ha_token", "");
         String[] urls = activeUrls(prefs);
-        if (urls.length == 0 || token.isEmpty()) return;
+        if (urls.length == 0 || token.isEmpty() || !pollInFlight.compareAndSet(false, true)) return;
         executor.execute(() -> {
+            try {
             for (String baseUrl : urls) {
                 if (baseUrl == null || baseUrl.isEmpty()) continue;
                 try {
@@ -110,6 +118,9 @@ public class DoorMonitorService extends Service {
                     return;
                 } catch (Exception ignored) {
                 }
+            }
+            } finally {
+                pollInFlight.set(false);
             }
         });
     }
@@ -157,7 +168,7 @@ public class DoorMonitorService extends Service {
                 .setTimeoutAfter(activeMs)
                 .build();
         manager.notify(RING_NOTIFICATION_ID, notification);
-        handler.postDelayed(() -> executor.execute(() -> handleAutoOpen(getSharedPreferences("settings", MODE_PRIVATE), ringId)), AUTO_OPEN_DELAY_MS);
+        handler.postDelayed(() -> autoOpenExecutor.execute(() -> handleAutoOpen(getSharedPreferences("settings", MODE_PRIVATE), ringId)), AUTO_OPEN_DELAY_MS);
     }
 
     private void handleAutoOpen(SharedPreferences prefs, long ringId) {

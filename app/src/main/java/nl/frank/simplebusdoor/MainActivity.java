@@ -561,12 +561,40 @@ public class MainActivity extends Activity {
         update.setOnClickListener(v -> checkForUpdates(true));
         content.addView(update);
 
+        Button clearHistory = secondaryButton(t("Belgeschiedenis wissen", "Clear doorbell history", "Klingelverlauf löschen"));
+        clearHistory.setOnClickListener(v -> confirmClearDoorbellHistory());
+        content.addView(clearHistory);
+
         TextView help = body(t(
                 "Beveiliging: gebruik buitenshuis bij voorkeur je Home Assistant Cloud/Nabu Casa URL met HTTPS. Het token wordt lokaal op je telefoon opgeslagen. Deel dit token niet.\n\nAutomatisch openen betekent: als iemand beneden aanbelt, opent de deur automatisch binnen de ingestelde tijd. WiFi-configuratie start alleen het tijdelijke configuratieportaal van de bridge.",
                 "Security: outside your home, prefer your Home Assistant Cloud/Nabu Casa HTTPS URL. The token is stored locally on your phone. Do not share it.\n\nAuto-open means: when someone rings downstairs, the door opens automatically during the configured time. WiFi setup only starts the bridge's temporary setup portal."
         ));
         help.setTextColor(MUTED);
         content.addView(card(help));
+    }
+
+    private void confirmClearDoorbellHistory() {
+        new AlertDialog.Builder(this)
+                .setTitle(t("Belgeschiedenis wissen?", "Clear doorbell history?", "Klingelverlauf löschen?"))
+                .setMessage(t(
+                        "Alle belgeschiedenis wordt gewist en de belteller gaat naar nul. Je instellingen blijven behouden.",
+                        "All doorbell history will be cleared and the ring counter reset to zero. Your settings will be kept.",
+                        "Der gesamte Klingelverlauf wird gelöscht und der Klingelzähler auf null gesetzt. Deine Einstellungen bleiben erhalten."))
+                .setNegativeButton(t("Annuleren", "Cancel", "Abbrechen"), null)
+                .setPositiveButton(t("Wissen", "Clear", "Löschen"), (dialog, which) -> {
+                    clearDoorbellHistory();
+                    Toast.makeText(this, t("Belgeschiedenis gewist", "Doorbell history cleared", "Klingelverlauf gelöscht"), Toast.LENGTH_SHORT).show();
+                })
+                .show();
+    }
+
+    private void clearDoorbellHistory() {
+        prefs().edit().remove("doorbell_history").putInt("doorbell_ring_count", 0).apply();
+        if (prefs().getBoolean("door_notifications_enabled", false)) {
+            Intent refresh = new Intent(this, DoorMonitorService.class);
+            refresh.setAction(DoorMonitorService.ACTION_REFRESH_SERVICE_NOTIFICATION);
+            startForegroundService(refresh);
+        }
     }
 
     private void addApiSettingsFields() {
@@ -1400,8 +1428,8 @@ public class MainActivity extends Activity {
                                 "\nMQTT: " + status.optBoolean("mqtt") +
                                 "\nTemp: " + status.optDouble("temp_c") + " C" +
                                 "\n" + t("Laatste busactiviteit: ", "Last bus activity: ", "Letzte Busaktivität: ") + lastBusSeen +
-                                "\n" + t("Laatste buscode: ", "Last bus code: ") + status.optInt("dbg_last_code") +
-                                "\n" + t("Laatste adres: ", "Last address: ") + status.optInt("dbg_last_addr") +
+                                "\n" + t("Laatste busbericht: ", "Last bus message: ", "Letzte Busnachricht: ") + busMessageText(visibleBusCode(status), visibleBusAddress(status)) +
+                                "\n" + t("Decoder: ", "Decoder: ", "Decoder: ") + (status.optInt("decoder_guard_us") == 0 ? t("origineel", "original", "original") : status.optInt("decoder_guard_us") / 1000.0 + " ms guard") +
                                 previousBusActivitiesText() +
                                 "\nDecode OK: " + status.optInt("dbg_decode_ok") +
                                 "\n" + t("Checksum fouten: ", "Checksum errors: ") + status.optInt("dbg_checksum_fail") +
@@ -1418,44 +1446,56 @@ public class MainActivity extends Activity {
         });
     }
 
+    private int visibleBusCode(JSONObject status) {
+        return status.has("dbg_last_message_code") ? status.optInt("dbg_last_message_code") : status.optInt("dbg_last_code");
+    }
+
+    private int visibleBusAddress(JSONObject status) {
+        return status.has("dbg_last_message_addr") ? status.optInt("dbg_last_message_addr") : status.optInt("dbg_last_addr");
+    }
+
+    private String busMessageText(int code, int address) {
+        if (!BusMessages.isVisible(code, address)) return t("Nog geen busbericht sinds herstart", "No bus message since restart", "Noch keine Busnachricht seit Neustart");
+        return BusMessages.name(code, prefs().getString("language", "nl")) +
+                " (" + t("code", "code", "Code") + " " + code + ", " +
+                t("adres", "address", "Adresse") + " " + address + ")";
+    }
+
     private String updateLastBusSeenText(JSONObject status) {
-        String signature =
-                status.optInt("dbg_last_code") + ":" +
-                status.optInt("dbg_last_addr") + ":" +
-                status.optInt("dbg_decode_ok") + ":" +
-                status.optInt("dbg_checksum_fail") + ":" +
-                status.optInt("dbg_addr_mismatch") + ":" +
-                status.optInt("dbg_mqtt_published");
         SharedPreferences prefs = prefs();
+        boolean modern = status.has("dbg_last_message_code");
+        long session = status.optLong("rx_session_id", -1);
+        if (modern && session != prefs.getLong("monitor_rx_session", -2)) {
+            prefs.edit().putLong("monitor_rx_session", session)
+                    .remove("monitor_last_bus_signature").remove("monitor_last_bus_seen_at")
+                    .remove("monitor_last_bus_code").remove("monitor_last_bus_addr")
+                    .remove("monitor_prev_bus_1_seen_at").remove("monitor_prev_bus_2_seen_at").apply();
+        }
+        int currentCode = visibleBusCode(status), currentAddr = visibleBusAddress(status);
+        if (!BusMessages.isVisible(currentCode, currentAddr)) {
+            return t("nog geen bericht sinds herstart", "no message since restart", "noch keine Nachricht seit Neustart");
+        }
+        String signature = modern ? session + ":" + status.optLong("dbg_message_seq") + ":" + status.optLong("dbg_last_message_ms")
+                : currentCode + ":" + currentAddr + ":" + status.optLong("dbg_decode_ok");
         String previous = prefs.getString("monitor_last_bus_signature", "");
         long seenAt = prefs.getLong("monitor_last_bus_seen_at", 0);
-        int currentCode = status.optInt("dbg_last_code", 0);
-        int currentAddr = status.optInt("dbg_last_addr", 0);
-        boolean hasBusData = status.optInt("dbg_last_code", 0) > 0 || status.optInt("dbg_decode_ok", 0) > 0;
-        if (hasBusData && !signature.equals(previous)) {
-            long previousSeenAt = prefs.getLong("monitor_last_bus_seen_at", 0);
-            int previousCode = prefs.getInt("monitor_last_bus_code", 0);
-            int previousAddr = prefs.getInt("monitor_last_bus_addr", 0);
+        if (!signature.equals(previous)) {
             SharedPreferences.Editor edit = prefs.edit();
-            if (previousSeenAt > 0 && !previous.isEmpty()) {
+            int previousCode = prefs.getInt("monitor_last_bus_code", 0), previousAddr = prefs.getInt("monitor_last_bus_addr", 0);
+            if (seenAt > 0 && !previous.isEmpty() && BusMessages.isVisible(previousCode, previousAddr)) {
                 edit.putLong("monitor_prev_bus_2_seen_at", prefs.getLong("monitor_prev_bus_1_seen_at", 0));
                 edit.putInt("monitor_prev_bus_2_code", prefs.getInt("monitor_prev_bus_1_code", 0));
                 edit.putInt("monitor_prev_bus_2_addr", prefs.getInt("monitor_prev_bus_1_addr", 0));
-                edit.putLong("monitor_prev_bus_1_seen_at", previousSeenAt);
+                edit.putLong("monitor_prev_bus_1_seen_at", seenAt);
                 edit.putInt("monitor_prev_bus_1_code", previousCode);
                 edit.putInt("monitor_prev_bus_1_addr", previousAddr);
             }
-            seenAt = System.currentTimeMillis();
-            edit
-                    .putString("monitor_last_bus_signature", signature)
-                    .putLong("monitor_last_bus_seen_at", seenAt)
-                    .putInt("monitor_last_bus_code", currentCode)
-                    .putInt("monitor_last_bus_addr", currentAddr)
-                    .apply();
+            long ageMs = modern ? Math.max(0, status.optLong("uptime_s") * 1000L - status.optLong("dbg_last_message_ms")) : 0;
+            seenAt = System.currentTimeMillis() - ageMs;
+            edit.putString("monitor_last_bus_signature", signature).putLong("monitor_last_bus_seen_at", seenAt)
+                    .putInt("monitor_last_bus_code", currentCode).putInt("monitor_last_bus_addr", currentAddr).apply();
         }
-        if (seenAt <= 0) return t("nog niet gezien", "not seen yet", "noch nicht gesehen");
-        return android.text.format.DateFormat.getDateFormat(this).format(new java.util.Date(seenAt)) +
-                " " +
+        return android.text.format.DateFormat.getDateFormat(this).format(new java.util.Date(seenAt)) + " " +
                 android.text.format.DateFormat.getTimeFormat(this).format(new java.util.Date(seenAt));
     }
 
@@ -1478,12 +1518,10 @@ public class MainActivity extends Activity {
     }
 
     private String busActivityLine(long seenAt, int code, int address) {
-        if (seenAt <= 0) return "";
+        if (seenAt <= 0 || !BusMessages.isVisible(code, address)) return "";
         String date = android.text.format.DateFormat.getDateFormat(this).format(new java.util.Date(seenAt));
         String time = android.text.format.DateFormat.getTimeFormat(this).format(new java.util.Date(seenAt));
-        return date + " " + time +
-                " - " + t("code", "code", "Code") + " " + code +
-                ", " + t("adres", "address", "Adresse") + " " + address;
+        return date + " " + time + " - " + busMessageText(code, address);
     }
 
     private String pretty(String state) {
