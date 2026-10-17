@@ -133,6 +133,7 @@ public class DoorMonitorService extends Service {
         long ringId = System.currentTimeMillis();
         prefs.edit()
                 .putLong("doorbell_pending_id", ringId)
+                .putString("doorbell_auto_result", "")
                 .putBoolean("doorbell_pending_handled", false)
                 .apply();
         updateServiceNotification();
@@ -194,14 +195,25 @@ public class DoorMonitorService extends Service {
                 .putLong("auto_open_last_attempt_at", now);
         if (AUTO_OPEN_ONCE.equals(mode)) attempt.putString("auto_open_mode", AUTO_OPEN_OFF);
         attempt.apply();
+        prefs.edit().putString("doorbell_auto_result", "pending").apply();
 
         try {
             callOpenDoorRepeated(prefs);
+            prefs.edit().putString("doorbell_auto_result", "success").apply();
+            NotificationManager ringManager = getSystemService(NotificationManager.class);
+            Intent resultIntent = new Intent(this, DoorRingActivity.class);
+            resultIntent.setAction(DoorRingActivity.ACTION_SHOW);
+            PendingIntent resultPending = PendingIntent.getActivity(this, RING_NOTIFICATION_ID + 2, resultIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            ringManager.notify(RING_NOTIFICATION_ID, baseNotification(RING_CHANNEL,
+                    t(prefs, "Automatisch geopend", "Automatically opened", "Automatisch geöffnet"),
+                    t(prefs, "Opencommando verstuurd. Geen verdere actie nodig.", "Open command sent. No further action needed.", "Öffnungsbefehl gesendet. Keine weitere Aktion erforderlich."))
+                    .setContentIntent(resultPending).setOnlyAlertOnce(true).setAutoCancel(true).build());
             appendDoorbellHistory(prefs,
                     autoOpenHistoryText(mode),
                     false);
             updateServiceNotification();
         } catch (Exception e) {
+            prefs.edit().putString("doorbell_auto_result", "failed").apply();
             appendDoorbellHistory(prefs, t(prefs, "Automatisch openen mislukt: ", "Auto-open failed: ", "Automatisches Öffnen fehlgeschlagen: ") + readableError(prefs, e), false);
             updateServiceNotification();
         }

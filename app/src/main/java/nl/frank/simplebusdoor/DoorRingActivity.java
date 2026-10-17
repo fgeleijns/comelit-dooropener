@@ -34,6 +34,20 @@ public class DoorRingActivity extends Activity {
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private final SharedPreferences.OnSharedPreferenceChangeListener resultListener = (preferences, key) -> {
+        if ("doorbell_auto_result".equals(key) || "doorbell_pending_id".equals(key)) handler.post(this::showRingScreen);
+    };
+
+    @Override protected void onResume() {
+        super.onResume();
+        prefs().registerOnSharedPreferenceChangeListener(resultListener);
+        showRingScreen();
+    }
+
+    @Override protected void onPause() {
+        prefs().unregisterOnSharedPreferenceChangeListener(resultListener);
+        super.onPause();
+    }
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -79,6 +93,18 @@ public class DoorRingActivity extends Activity {
         subtitleLp.setMargins(0, dp(8), 0, dp(22));
         card.addView(subtitle, subtitleLp);
 
+        String automaticResult = prefs.getString("doorbell_auto_result", "");
+        if ("success".equals(automaticResult) || "pending".equals(automaticResult)) {
+            title.setText("success".equals(automaticResult)
+                    ? t(prefs, "Automatisch geopend", "Automatically opened", "Automatisch geöffnet")
+                    : t(prefs, "Automatisch openen…", "Opening automatically…", "Automatisches Öffnen…"));
+            subtitle.setText("success".equals(automaticResult)
+                    ? t(prefs, "Opencommando verstuurd. Geen verdere actie nodig.", "Open command sent. No further action needed.", "Öffnungsbefehl gesendet. Keine weitere Aktion erforderlich.")
+                    : t(prefs, "Even geduld", "Please wait", "Bitte warten"));
+            setContentView(root);
+            return;
+        }
+
         Button open = button(t(prefs, "Entree deur openen", "Open entrance door", "Eingangstür öffnen"), ACCENT);
         open.setOnClickListener(v -> openDoor());
         card.addView(open);
@@ -91,6 +117,10 @@ public class DoorRingActivity extends Activity {
     }
 
     private void openDoor() {
+        if ("success".equals(prefs().getString("doorbell_auto_result", "")) || "pending".equals(prefs().getString("doorbell_auto_result", ""))) {
+            showRingScreen();
+            return;
+        }
         clearRingNotificationAndSound();
         markHandled(t(prefs(), "Deur geopend", "Door opened", "Tür geöffnet"));
         int attempts = Math.max(1, Math.min(5, prefs().getInt("manual_open_repeat_count", 2)));
@@ -112,6 +142,10 @@ public class DoorRingActivity extends Activity {
     }
 
     private void dismissRing() {
+        if ("success".equals(prefs().getString("doorbell_auto_result", "")) || "pending".equals(prefs().getString("doorbell_auto_result", ""))) {
+            showRingScreen();
+            return;
+        }
         clearRingNotificationAndSound();
         markHandled(t(prefs(), "Niet geopend", "Not opened", "Nicht geöffnet"));
         Toast.makeText(this, t(prefs(), "Niet geopend", "Not opened", "Nicht geöffnet"), Toast.LENGTH_SHORT).show();
